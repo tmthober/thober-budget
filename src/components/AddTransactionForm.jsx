@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import CategoryPicker from './CategoryPicker'
+import CurrencyInput, { centsToAmount } from './CurrencyInput'
 
 export default function AddTransactionForm({ onSaved }) {
   const [groups, setGroups] = useState([])
   const [categories, setCategories] = useState([])
   const [categoryId, setCategoryId] = useState('')
-  const [amount, setAmount] = useState('')
+  const [amountCents, setAmountCents] = useState(0)
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
@@ -27,19 +28,18 @@ export default function AddTransactionForm({ onSaved }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    const parsedAmount = parseFloat(amount.replace(',', '.'))
     if (!categoryId) {
       setError('Escolha uma categoria.')
       return
     }
-    if (!parsedAmount || parsedAmount <= 0) {
+    if (!amountCents || amountCents <= 0) {
       setError('Informe um valor maior que zero.')
       return
     }
     setSaving(true)
     const { error: insertError } = await supabase.from('transactions').insert({
       category_id: categoryId,
-      amount: parsedAmount,
+      amount: centsToAmount(amountCents),
       date,
       note: note || null,
     })
@@ -48,7 +48,7 @@ export default function AddTransactionForm({ onSaved }) {
       setError('Não foi possível salvar. Tente novamente.')
       return
     }
-    setAmount('')
+    setAmountCents(0)
     setNote('')
     onSaved()
   }
@@ -66,14 +66,8 @@ export default function AddTransactionForm({ onSaved }) {
       </div>
 
       <div className="form-field">
-        <label htmlFor="amount">Valor (R$)</label>
-        <input
-          id="amount"
-          inputMode="decimal"
-          placeholder="0,00"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
+        <label htmlFor="amount">Valor</label>
+        <CurrencyInput id="amount" cents={amountCents} onChange={setAmountCents} />
       </div>
 
       <div className="form-field">
