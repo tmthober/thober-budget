@@ -1,0 +1,267 @@
+:root {
+  --bg: #f7f5ef;
+  --surface: #ffffff;
+  --ink: #232420;
+  --ink-soft: #6b6a62;
+  --border: #e3e0d4;
+  --accent: #2f6f5e;
+  --accent-soft: #e3efe9;
+  --danger: #ac4a34;
+  --danger-soft: #f7e8e3;
+  --radius: 8px;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+#root {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 16px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.app-header h1 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.icon-btn {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 20px;
+  padding: 4px;
+  border-radius: var(--radius);
+}
+.icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 72px;
+}
+
+.tobudget-card {
+  text-align: center;
+  padding: 22px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.tobudget-card .label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0 0 4px;
+}
+.tobudget-card .amount {
+  font-size: 30px;
+  font-weight: 600;
+  margin: 0;
+}
+.amount.positive { color: var(--accent); }
+.amount.negative { color: var(--danger); }
+
+.group-title {
+  padding: 14px 18px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: none;
+  display: flex;
+  justify-content: space-between;
+}
+
+.category-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.category-row .name { font-size: 14.5px; }
+.category-row .sub { font-size: 12px; color: var(--ink-soft); margin: 2px 0 0; }
+.category-row .available { font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+
+.tab-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.tab-bar button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 10px 4px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+}
+.tab-bar button.active { color: var(--accent); }
+
+.tx-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.tx-row .name { font-size: 14.5px; margin: 0; }
+.tx-row .meta { font-size: 12px; color: var(--ink-soft); margin: 2px 0 0; }
+.tx-row .amt { font-size: 14.5px; font-weight: 600; color: var(--danger); }
+.tx-row .amt.income { color: var(--accent); }
+
+.form-screen {
+  padding: 18px;
+}
+.form-field {
+  margin-bottom: 16px;
+}
+.form-field label {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+.form-field input, .form-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+}
+.form-field input:focus, .form-field select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.primary-btn {
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+.primary-btn:disabled { opacity: 0.5; cursor: default; }
+
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 16px rgba(35, 36, 32, 0.12);
+  z-index: 20;
+}
+.combobox-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding: 8px 12px 4px;
+  margin: 0;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+.combobox-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border: none;
+  background: transparent;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.combobox-option:hover, .combobox-option:focus {
+  background: var(--accent-soft);
+}
+.combobox-empty {
+  padding: 14px 12px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.error-text {
+  color: var(--danger);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.login-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px;
+}
+.login-screen h1 {
+  font-size: 22px;
+  margin: 0 0 6px;
+}
+.login-screen p {
+  color: var(--ink-soft);
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.empty-state {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
