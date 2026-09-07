@@ -4,6 +4,7 @@ import Login from './components/Login'
 import BudgetView from './components/BudgetView'
 import TransactionsView from './components/TransactionsView'
 import AddTransactionForm from './components/AddTransactionForm'
+import { IconBudget, IconList, IconPlus, IconLogout } from './components/icons'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -35,7 +36,7 @@ export default function App() {
       <header className="app-header">
         <h1>Orçamento familiar</h1>
         <button className="icon-btn" onClick={() => supabase.auth.signOut()} aria-label="Sair">
-          Sair
+          <IconLogout />
         </button>
       </header>
 
@@ -46,14 +47,34 @@ export default function App() {
       </div>
 
       <nav className="tab-bar">
-        <button className={tab === 'budget' ? 'active' : ''} onClick={() => setTab('budget')}>
-          Orçamento
+        <button
+          className={tab === 'budget' ? 'active' : ''}
+          onClick={() => setTab('budget')}
+          aria-label="Orçamento"
+          aria-current={tab === 'budget' ? 'page' : undefined}
+        >
+          <IconBudget />
+          <span>Orçamento</span>
         </button>
-        <button className={tab === 'add' ? 'active' : ''} onClick={() => setTab('add')}>
-          + Lançar
-        </button>
-        <button className={tab === 'transactions' ? 'active' : ''} onClick={() => setTab('transactions')}>
-          Transações
+
+        <div className="tab-bar-fab-slot">
+          <button
+            className="fab"
+            onClick={() => setTab('add')}
+            aria-label="Lançar despesa"
+          >
+            <IconPlus />
+          </button>
+        </div>
+
+        <button
+          className={tab === 'transactions' ? 'active' : ''}
+          onClick={() => setTab('transactions')}
+          aria-label="Transações"
+          aria-current={tab === 'transactions' ? 'page' : undefined}
+        >
+          <IconList />
+          <span>Transações</span>
         </button>
       </nav>
     </>
