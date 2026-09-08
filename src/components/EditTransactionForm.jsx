@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import CategoryPicker from './CategoryPicker'
 import CurrencyInput, { amountToCents, centsToAmount } from './CurrencyInput'
+import OverspendWarning from './OverspendWarning'
 import { IconChevronLeft } from './icons'
+import { monthKeyFromDateString } from '../lib/budget'
+import { checkOverspend } from '../lib/overspend'
 
 export default function EditTransactionForm({ transaction, onBack, onSaved, onDeleted }) {
   const [groups, setGroups] = useState([])
@@ -15,6 +18,7 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [overspendInfo, setOverspendInfo] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -54,7 +58,14 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
       setError('Não foi possível salvar. Tente novamente.')
       return
     }
-    onSaved()
+
+    const monthKey = monthKeyFromDateString(date)
+    const overspend = await checkOverspend(categoryId, monthKey)
+    if (overspend) {
+      setOverspendInfo(overspend)
+    } else {
+      onSaved()
+    }
   }
 
   async function handleDelete() {
@@ -69,6 +80,16 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
       return
     }
     onDeleted()
+  }
+
+  if (overspendInfo) {
+    return (
+      <OverspendWarning
+        overspendInfo={overspendInfo}
+        categories={categories}
+        onResolve={() => { setOverspendInfo(null); onSaved() }}
+      />
+    )
   }
 
   return (

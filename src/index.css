@@ -405,3 +405,53 @@ input, select, textarea {
   color: var(--ink-soft);
   font-size: 14px;
 }
+
+.overspend-alert {
+  padding: 16px 18px;
+  background: var(--danger-soft);
+  border-bottom: 1px solid var(--border);
+}
+.overspend-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--danger);
+  margin: 0 0 6px;
+}
+.overspend-sub {
+  font-size: 13.5px;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.overspend-options {
+  padding: 8px 18px;
+}
+.overspend-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 14px;
+  text-align: left;
+}
+.overspend-option.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.overspend-option-available {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.overspend-actions {
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

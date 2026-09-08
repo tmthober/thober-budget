@@ -74,6 +74,11 @@ export function computeCategorySummaries(categories, budgetEntries, transactions
   })
 }
 
+// 'YYYY-MM-DD' (data de uma transação) -> 'YYYY-MM-01' (chave de mês)
+export function monthKeyFromDateString(dateStr) {
+  return `${dateStr.slice(0, 7)}-01`
+}
+
 // "Pronto para orçar" = renda acumulada até o mês - total orçado acumulado até o mês
 export function computeToBeBudgeted(categories, budgetEntries, transactions, monthKey) {
   const targetYm = yearMonth(monthKey)

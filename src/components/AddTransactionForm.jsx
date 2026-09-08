@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import CategoryPicker from './CategoryPicker'
 import CurrencyInput, { centsToAmount } from './CurrencyInput'
+import OverspendWarning from './OverspendWarning'
+import { monthKeyFromDateString } from '../lib/budget'
+import { checkOverspend } from '../lib/overspend'
 
 export default function AddTransactionForm({ onSaved }) {
   const [groups, setGroups] = useState([])
@@ -12,6 +15,7 @@ export default function AddTransactionForm({ onSaved }) {
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [overspendInfo, setOverspendInfo] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -48,9 +52,28 @@ export default function AddTransactionForm({ onSaved }) {
       setError('Não foi possível salvar. Tente novamente.')
       return
     }
+
+    const savedCategoryId = categoryId
+    const monthKey = monthKeyFromDateString(date)
     setAmountCents(0)
     setNote('')
-    onSaved()
+
+    const overspend = await checkOverspend(savedCategoryId, monthKey)
+    if (overspend) {
+      setOverspendInfo(overspend)
+    } else {
+      onSaved()
+    }
+  }
+
+  if (overspendInfo) {
+    return (
+      <OverspendWarning
+        overspendInfo={overspendInfo}
+        categories={categories}
+        onResolve={() => { setOverspendInfo(null); onSaved() }}
+      />
+    )
   }
 
   return (

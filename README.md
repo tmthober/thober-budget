@@ -1,80 +1,112 @@
-# Orçamento familiar
+# Orçamento Familiar
 
-App simples de controle financeiro no estilo YNAB (envelope budgeting), feito
-para você e sua esposa lançarem despesas e acompanharem o orçamento mensal
-pelo celular. Substitui o Google Forms + planilha por um app próprio.
+App de controle financeiro pessoal no método de orçamento por envelopes
+(o mesmo princípio do YNAB — *You Need A Budget*): toda categoria recebe um
+valor no início do mês, e cada gasto desconta desse valor. Feito pra uso
+familiar, com apenas login de email/senha para os dois usuários.
 
-**MVP atual:** sem contas bancárias separadas e sem campo "quem lançou" —
-igual à sua planilha hoje. Dá para adicionar depois sem quebrar nada.
+Substitui um fluxo anterior de Google Forms + Google Sheets por um app
+próprio, com backend em Supabase e hospedagem estática no GitHub Pages.
 
-## Como funciona
+## Funcionalidades
 
-- **Orçamento**: tela principal, mostra "pronto para orçar" e cada categoria
-  agrupada (Immediate Obligations, Variable Expenses, True Expenses,
-  Long-term Savings, Wish Farm). Toque no valor "Orçado" de uma categoria
-  para editar quanto você quer atribuir a ela no mês.
-- **+ Lançar**: formulário para registrar uma despesa (ou renda, escolhendo a
-  categoria "💰 Renda").
-- **Transações**: lista de todos os lançamentos, mais recentes primeiro.
+- **Orçamento mensal** — categorias agrupadas (obrigações fixas, gastos
+  variáveis, gastos anuais, poupança de longo prazo), com "pronto para
+  orçar" calculado a partir da renda lançada.
+- **Barra de progresso por categoria** — visualização de gasto vs. orçado,
+  além de um resumo agregado do mês inteiro.
+- **Edição inline do orçamento** — toque no valor orçado de qualquer
+  categoria para ajustá-lo.
+- **Lançamento de despesas/receitas** — com busca por categoria (digite para
+  filtrar, ou role a lista completa) e campo de valor no estilo calculadora
+  de banco (a formatação em R$ aparece sozinha, sem precisar digitar vírgula).
+- **Edição e exclusão de lançamentos passados**, com confirmação antes de
+  excluir.
+- **Instalável como app** (PWA) — ícone e nome próprios na tela inicial do
+  celular, tanto Android quanto iOS.
 
-## Passo a passo para colocar no ar
+## Stack
 
-### 1. Criar o banco de dados (Supabase, gratuito)
+| Camada        | Tecnologia                          |
+|---------------|--------------------------------------|
+| Frontend      | React 18 + Vite                      |
+| Estilo        | CSS puro (sem framework)              |
+| Backend/dados | [Supabase](https://supabase.com) (Postgres + Auth + REST) |
+| Hospedagem    | GitHub Pages, via GitHub Actions      |
 
-1. Crie uma conta em [supabase.com](https://supabase.com) e um novo projeto.
-2. No painel do projeto, vá em **SQL Editor** → **New query**.
-3. Cole todo o conteúdo do arquivo [`supabase/schema.sql`](supabase/schema.sql)
-   deste projeto e clique em **Run**. Isso cria as tabelas e já popula com as
-   suas categorias e o orçamento de setembro/2026, extraídos da sua planilha.
-4. Vá em **Authentication → Users** e crie duas contas (uma para você, uma
-   para sua esposa), com email e senha. É esse login que vocês vão usar no
-   app — não precisa de nenhuma tela de "criar conta" pública.
-5. Vá em **Project Settings → API** e anote dois valores: **Project URL** e
-   a chave **anon public**. Você vai precisar deles nos próximos passos.
+Sem framework de UI e sem backend próprio de propósito — o app é pequeno o
+bastante pra não precisar da complexidade extra, e o Supabase cobre banco de
+dados, autenticação e API de uma vez.
 
-### 2. Colocar o código no GitHub
+## Estrutura do projeto
 
-1. Crie um repositório novo no GitHub (pode ser privado).
-2. Suba os arquivos deste projeto para o repositório (pelo site do GitHub,
-   arrastando os arquivos, ou via `git push` se preferir linha de comando).
+```
+├── public/
+│   ├── icons/                  # ícones do PWA (gerados por scripts/make_icons.py)
+│   └── manifest.webmanifest    # manifesto do PWA
+├── src/
+│   ├── components/
+│   │   ├── AddTransactionForm.jsx
+│   │   ├── BudgetView.jsx        # tela de orçamento (categorias + progresso)
+│   │   ├── CategoryPicker.jsx    # combobox de categoria com busca
+│   │   ├── CurrencyInput.jsx     # input de valor estilo "calculadora de banco"
+│   │   ├── EditTransactionForm.jsx
+│   │   ├── icons.jsx             # ícones SVG inline usados na navegação
+│   │   ├── Login.jsx
+│   │   └── TransactionsView.jsx  # registro de lançamentos
+│   ├── lib/
+│   │   └── budget.js           # cálculo de orçado/gasto/disponível por mês
+│   ├── App.jsx                 # navegação por abas + estado de sessão
+│   ├── main.jsx
+│   └── supabaseClient.js
+├── supabase/
+│   └── schema.sql              # tabelas, RLS e seed de categorias
+├── docs/
+│   └── DEPLOY_GUIDE.md         # passo a passo detalhado de deploy
+└── .github/workflows/deploy.yml
+```
 
-### 3. Configurar as chaves do Supabase como segredo do GitHub
+## Modelo de dados
 
-1. No repositório, vá em **Settings → Secrets and variables → Actions**.
-2. Clique em **New repository secret** e crie:
-   - `VITE_SUPABASE_URL` → cole o Project URL do Supabase.
-   - `VITE_SUPABASE_ANON_KEY` → cole a chave anon public do Supabase.
+- `category_groups` — agrupamento de categorias (ex: "Immediate Obligations")
+- `categories` — categorias individuais, com flag `is_income` para a
+  categoria de renda
+- `budget_entries` — valor orçado por categoria, por mês (`category_id` +
+  `month` são únicos juntos)
+- `transactions` — lançamentos (`category_id`, `date`, `amount`, `note`)
 
-Isso mantém suas chaves fora do código público.
+`ACTIVITY` (gasto do mês) e `AVAILABLE` (disponível, com rollover entre
+meses) não são colunas armazenadas — são calculados em `src/lib/budget.js` a
+partir de `budget_entries` + `transactions` toda vez que a tela carrega.
 
-### 4. Ativar o GitHub Pages
+## Começando
 
-1. No repositório, vá em **Settings → Pages**.
-2. Em **Build and deployment → Source**, escolha **GitHub Actions**.
-3. Pronto — o workflow em `.github/workflows/deploy.yml` já está configurado
-   para buildar e publicar o app automaticamente a cada `push` na branch
-   `main`. Se o primeiro deploy não disparar sozinho, vá na aba **Actions**
-   do repositório e rode o workflow "Deploy to GitHub Pages" manualmente.
-4. Depois do primeiro deploy, o link do app aparece em **Settings → Pages**
-   (algo como `https://seu-usuario.github.io/nome-do-repo/`).
+### Pré-requisitos
+- Node.js 20+
+- Uma conta gratuita no [Supabase](https://supabase.com)
 
-### 5. Usar no celular
-
-Abra o link do app no navegador do celular (seu e da sua esposa) e, no menu
-do navegador, escolha **"Adicionar à tela inicial"**. Fica com cara de app,
-sem precisar publicar em loja nenhuma.
-
-## Rodando localmente (opcional, para testar antes de publicar)
+### Rodando localmente
 
 ```bash
 npm install
-cp .env.example .env.local   # preencha com suas chaves do Supabase
+cp .env.example .env.local   # preencha com as chaves do seu projeto Supabase
 npm run dev
 ```
 
-## Próximos passos possíveis
+### Deploy
 
-- Separar lançamentos por conta (corrente, cartão, dinheiro).
-- Registrar quem lançou cada transação (você / esposa).
-- Editar e excluir transações já lançadas (hoje só é possível criar).
-- Gráficos de gasto por categoria/mês.
+Veja o [guia de deploy completo](docs/DEPLOY_GUIDE.md) para o passo a passo
+detalhado (Supabase, GitHub, variáveis de ambiente e GitHub Pages).
+
+## Roadmap
+
+- [ ] Separar lançamentos por conta (corrente, cartão, dinheiro)
+- [ ] Registrar quem lançou cada transação
+- [ ] Captura automática de notificações de banco/carteira digital (fila de
+      "para categorizar")
+- [ ] Gráficos de gasto por categoria/mês
+
+## Licença
+
+Projeto pessoal, sem licença definida — sinta-se livre pra usar como
+referência.
