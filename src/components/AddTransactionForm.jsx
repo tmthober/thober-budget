@@ -58,7 +58,12 @@ export default function AddTransactionForm({ onSaved }) {
     setAmountCents(0)
     setNote('')
 
-    const overspend = await checkOverspend(savedCategoryId, monthKey)
+    let overspend = null
+    try {
+      overspend = await checkOverspend(savedCategoryId, monthKey)
+    } catch {
+      overspend = null
+    }
     if (overspend) {
       setOverspendInfo(overspend)
     } else {

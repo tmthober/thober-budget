@@ -60,7 +60,12 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
     }
 
     const monthKey = monthKeyFromDateString(date)
-    const overspend = await checkOverspend(categoryId, monthKey)
+    let overspend = null
+    try {
+      overspend = await checkOverspend(categoryId, monthKey)
+    } catch {
+      overspend = null
+    }
     if (overspend) {
       setOverspendInfo(overspend)
     } else {

@@ -11,6 +11,9 @@ export async function checkOverspend(categoryId, monthKey) {
     supabase.from('transactions').select('*').eq('category_id', categoryId),
   ])
 
+  // Se qualquer leitura falhou, não arrisca calcular em cima de dado
+  // incompleto — só não mostra o aviso dessa vez.
+  if (catRes.error || budgetRes.error || txRes.error) return null
   if (!catRes.data) return null
 
   const [summary] = computeCategorySummaries(
@@ -20,7 +23,7 @@ export async function checkOverspend(categoryId, monthKey) {
     monthKey
   )
 
-  if (summary.available >= 0) return null
+  if (summary.available >= -0.005) return null
 
   return {
     category: catRes.data,
@@ -30,14 +33,21 @@ export async function checkOverspend(categoryId, monthKey) {
 }
 
 // Move um valor do orçado de uma categoria pra outra, no mesmo mês.
-// Ambas as linhas em budget_entries são lidas primeiro (pra somar/subtrair
-// em cima do que já existe) e depois gravadas com upsert.
+// Lê o valor orçado atual das duas categorias primeiro, pra somar/subtrair
+// em cima do que já existe — e SÓ escreve se as duas leituras derem certo.
+// Isso é essencial: se a leitura falhasse silenciosamente e o código tratasse
+// isso como "orçado atual = 0", o upsert abaixo SOBRESCREVERIA o valor real
+// da categoria com só a diferença, destruindo o que já estava orçado.
 export async function moveBudgetedAmount(fromCategoryId, toCategoryId, monthKey, amount) {
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('budget_entries')
     .select('*')
     .in('category_id', [fromCategoryId, toCategoryId])
     .eq('month', monthKey)
+
+  if (readError) {
+    return { error: readError }
+  }
 
   const findAmount = (categoryId) => {
     const row = (existing ?? []).find((b) => b.category_id === categoryId)
@@ -47,7 +57,7 @@ export async function moveBudgetedAmount(fromCategoryId, toCategoryId, monthKey,
   const newFromAmount = findAmount(fromCategoryId) - amount
   const newToAmount = findAmount(toCategoryId) + amount
 
-  const { error } = await supabase.from('budget_entries').upsert(
+  const { error: writeError } = await supabase.from('budget_entries').upsert(
     [
       { category_id: fromCategoryId, month: monthKey, budgeted_amount: newFromAmount },
       { category_id: toCategoryId, month: monthKey, budgeted_amount: newToAmount },
@@ -55,5 +65,5 @@ export async function moveBudgetedAmount(fromCategoryId, toCategoryId, monthKey,
     { onConflict: 'category_id,month' }
   )
 
-  return { error }
+  return { error: writeError }
 }
