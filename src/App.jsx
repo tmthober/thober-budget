@@ -4,7 +4,8 @@ import Login from './components/Login'
 import BudgetView from './components/BudgetView'
 import TransactionsView from './components/TransactionsView'
 import AddTransactionForm from './components/AddTransactionForm'
-import { IconBudget, IconList, IconPlus, IconLogout } from './components/icons'
+import ReportsView from './components/ReportsView'
+import { IconBudget, IconList, IconPlus, IconLogout, IconPieChart } from './components/icons'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -42,6 +43,7 @@ export default function App() {
 
       <div className="content">
         {tab === 'budget' && <BudgetView refreshKey={refreshKey} />}
+        {tab === 'reports' && <ReportsView />}
         {tab === 'transactions' && <TransactionsView refreshKey={refreshKey} />}
         {tab === 'add' && <AddTransactionForm onSaved={handleTransactionSaved} />}
       </div>
@@ -55,6 +57,16 @@ export default function App() {
         >
           <IconBudget />
           <span>Orçamento</span>
+        </button>
+
+        <button
+          className={tab === 'reports' ? 'active' : ''}
+          onClick={() => setTab('reports')}
+          aria-label="Relatórios"
+          aria-current={tab === 'reports' ? 'page' : undefined}
+        >
+          <IconPieChart />
+          <span>Relatórios</span>
         </button>
 
         <div className="tab-bar-fab-slot">
