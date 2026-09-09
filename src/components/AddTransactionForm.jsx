@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import CategoryPicker from './CategoryPicker'
+import CategoryStatus from './CategoryStatus'
 import CurrencyInput, { centsToAmount } from './CurrencyInput'
 import OverspendWarning from './OverspendWarning'
 import { monthKeyFromDateString } from '../lib/budget'
@@ -91,6 +92,7 @@ export default function AddTransactionForm({ onSaved }) {
           value={categoryId}
           onChange={setCategoryId}
         />
+        <CategoryStatus categoryId={categoryId} monthKey={monthKeyFromDateString(date)} />
       </div>
 
       <div className="form-field">

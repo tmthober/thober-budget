@@ -1,10 +1,11 @@
 import { supabase } from '../supabaseClient'
 import { computeCategorySummaries } from './budget'
 
-// Depois de salvar uma transação, verifica se a categoria dela ficou negativa
-// (disponível < 0) no mês da transação. Busca só os dados dessa categoria,
-// pra não precisar recarregar o app inteiro.
-export async function checkOverspend(categoryId, monthKey) {
+// Busca orçado/gasto/disponível de UMA categoria num mês, sem precisar
+// carregar o app inteiro. Usado tanto pelo aviso de estouro quanto pela
+// dica que aparece no formulário de lançamento assim que a categoria é
+// escolhida.
+export async function fetchCategorySummary(categoryId, monthKey) {
   const [catRes, budgetRes, txRes] = await Promise.all([
     supabase.from('categories').select('*').eq('id', categoryId).single(),
     supabase.from('budget_entries').select('*').eq('category_id', categoryId),
@@ -12,9 +13,8 @@ export async function checkOverspend(categoryId, monthKey) {
   ])
 
   // Se qualquer leitura falhou, não arrisca calcular em cima de dado
-  // incompleto — só não mostra o aviso dessa vez.
-  if (catRes.error || budgetRes.error || txRes.error) return null
-  if (!catRes.data) return null
+  // incompleto.
+  if (catRes.error || budgetRes.error || txRes.error || !catRes.data) return null
 
   const [summary] = computeCategorySummaries(
     [catRes.data],
@@ -22,11 +22,18 @@ export async function checkOverspend(categoryId, monthKey) {
     txRes.data ?? [],
     monthKey
   )
+  return summary
+}
 
+// Depois de salvar uma transação, verifica se a categoria dela ficou negativa
+// (disponível < 0) no mês da transação.
+export async function checkOverspend(categoryId, monthKey) {
+  const summary = await fetchCategorySummary(categoryId, monthKey)
+  if (!summary) return null
   if (summary.available >= -0.005) return null
 
   return {
-    category: catRes.data,
+    category: summary,
     monthKey,
     overspentAmount: Math.abs(summary.available),
   }
