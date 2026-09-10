@@ -22,29 +22,46 @@ export default function ReportsView() {
   const [groups, setGroups] = useState([])
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState(null)
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      const [c, g, t] = await Promise.all([
-        supabase.from('categories').select('*'),
-        supabase.from('category_groups').select('*'),
-        supabase.from('transactions').select('*'),
-      ])
-      setCategories(c.data ?? [])
-      setGroups(g.data ?? [])
-      setTransactions(t.data ?? [])
+  async function load() {
+    setLoading(true)
+    setLoadError(false)
+    const [c, g, t] = await Promise.all([
+      supabase.from('categories').select('*'),
+      supabase.from('category_groups').select('*'),
+      supabase.from('transactions').select('*'),
+    ])
+    if (c.error || g.error || t.error) {
+      setLoadError(true)
       setLoading(false)
+      return
     }
-    load()
-  }, [])
+    setCategories(c.data ?? [])
+    setGroups(g.data ?? [])
+    setTransactions(t.data ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
 
   // Volta pra visão geral sempre que o filtro de período muda, pra não ficar
   // "preso" num grupo que não existe mais nesse novo período.
   useEffect(() => { setSelectedGroupId(null) }, [preset, customStart, customEnd])
 
   if (loading) return <div className="empty-state">Carregando relatório...</div>
+
+  if (loadError) {
+    return (
+      <div className="empty-state">
+        <p>Não foi possível carregar o relatório. Verifique sua conexão.</p>
+        <button className="secondary-btn" onClick={load} style={{ marginTop: 12 }}>
+          Tentar novamente
+        </button>
+      </div>
+    )
+  }
 
   const today = new Date()
   const range = preset === 'custom' ? { start: customStart, end: customEnd } : presetRange(preset, today)

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { supabase } from '../supabaseClient'
 import { formatCurrency } from '../lib/budget'
 import EditTransactionForm from './EditTransactionForm'
@@ -7,15 +8,22 @@ export default function TransactionsView({ refreshKey }) {
   const [transactions, setTransactions] = useState([])
   const [categoriesById, setCategoriesById] = useState({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [editingTx, setEditingTx] = useState(null)
   const [localRefresh, setLocalRefresh] = useState(0)
 
   async function load() {
     setLoading(true)
+    setLoadError(false)
     const [t, c] = await Promise.all([
       supabase.from('transactions').select('*').order('date', { ascending: false }),
       supabase.from('categories').select('*'),
     ])
+    if (t.error || c.error) {
+      setLoadError(true)
+      setLoading(false)
+      return
+    }
     setTransactions(t.data ?? [])
     const map = {}
     for (const cat of c.data ?? []) map[cat.id] = cat
@@ -27,16 +35,34 @@ export default function TransactionsView({ refreshKey }) {
 
   if (editingTx) {
     return (
-      <EditTransactionForm
-        transaction={editingTx}
-        onBack={() => setEditingTx(null)}
-        onSaved={() => { setEditingTx(null); setLocalRefresh((k) => k + 1) }}
-        onDeleted={() => { setEditingTx(null); setLocalRefresh((k) => k + 1) }}
-      />
+      <motion.div
+        initial={{ opacity: 0, x: 24 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+      >
+        <EditTransactionForm
+          transaction={editingTx}
+          onBack={() => setEditingTx(null)}
+          onSaved={() => { setEditingTx(null); setLocalRefresh((k) => k + 1) }}
+          onDeleted={() => { setEditingTx(null); setLocalRefresh((k) => k + 1) }}
+        />
+      </motion.div>
     )
   }
 
   if (loading) return <div className="empty-state">Carregando lançamentos...</div>
+
+  if (loadError) {
+    return (
+      <div className="empty-state">
+        <p>Não foi possível carregar os lançamentos. Verifique sua conexão.</p>
+        <button className="secondary-btn" onClick={load} style={{ marginTop: 12 }}>
+          Tentar novamente
+        </button>
+      </div>
+    )
+  }
+
   if (transactions.length === 0) {
     return <div className="empty-state">Nenhum lançamento ainda. Toque em "+" para adicionar o primeiro.</div>
   }

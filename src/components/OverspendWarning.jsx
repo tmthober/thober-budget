@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../supabaseClient'
 import { formatCurrency } from '../lib/budget'
 import { computeCategorySummaries } from '../lib/budget'
@@ -92,20 +93,35 @@ export default function OverspendWarning({ overspendInfo, categories, onResolve 
         </div>
       )}
 
-      {selectedId && (
-        <div className="form-field" style={{ padding: '0 18px' }}>
-          <label htmlFor="move-amount">Valor a mover</label>
-          <CurrencyInput id="move-amount" cents={amountCents} onChange={setAmountCents} />
-        </div>
-      )}
+      <AnimatePresence>
+        {selectedId && (
+          <motion.div
+            className="form-field"
+            style={{ padding: '0 18px', overflow: 'hidden' }}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+          >
+            <label htmlFor="move-amount">Valor a mover</label>
+            <CurrencyInput id="move-amount" cents={amountCents} onChange={setAmountCents} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {error && <p className="error-text" style={{ padding: '0 18px' }}>{error}</p>}
 
       <div className="overspend-actions">
         {selectedId && (
-          <button className="primary-btn" onClick={handleConfirm} disabled={saving}>
+          <motion.button
+            className="primary-btn"
+            onClick={handleConfirm}
+            disabled={saving}
+            whileTap={{ scale: 0.97 }}
+            transition={{ duration: 0.1 }}
+          >
             {saving ? 'Movendo...' : 'Mover e continuar'}
-          </button>
+          </motion.button>
         )}
         <button className="secondary-btn" onClick={onResolve} disabled={saving} style={{ width: '100%' }}>
           Ignorar por enquanto

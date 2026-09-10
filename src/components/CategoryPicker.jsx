@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 // Combobox de categoria: digitando, filtra a lista; sem digitar nada,
 // mostra todas agrupadas e dá pra rolar. Não depende de nenhuma lib externa.
@@ -59,29 +60,37 @@ export default function CategoryPicker({ groups, categories, value, onChange }) 
         autoComplete="off"
       />
 
-      {open && (
-        <div className="combobox-list">
-          {visibleGroups.length === 0 && (
-            <p className="combobox-empty">Nenhuma categoria encontrada</p>
-          )}
-          {visibleGroups.map(({ group, cats }) => (
-            <div key={group.id}>
-              <p className="combobox-group-label">{group.name}</p>
-              {cats.map((cat) => (
-                <button
-                  type="button"
-                  key={cat.id}
-                  className="combobox-option"
-                  onMouseDown={(e) => e.preventDefault()} // evita perder o foco antes do click
-                  onClick={() => handleSelect(cat)}
-                >
-                  {cat.name}
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="combobox-list"
+            initial={{ opacity: 0, scale: 0.97, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: -4 }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
+          >
+            {visibleGroups.length === 0 && (
+              <p className="combobox-empty">Nenhuma categoria encontrada</p>
+            )}
+            {visibleGroups.map(({ group, cats }) => (
+              <div key={group.id}>
+                <p className="combobox-group-label">{group.name}</p>
+                {cats.map((cat) => (
+                  <button
+                    type="button"
+                    key={cat.id}
+                    className="combobox-option"
+                    onMouseDown={(e) => e.preventDefault()} // evita perder o foco antes do click
+                    onClick={() => handleSelect(cat)}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

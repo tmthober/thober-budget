@@ -31,6 +31,18 @@ body {
 button {
   font-family: inherit;
   cursor: pointer;
+  transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+button:active:not(:disabled):not(.fab) {
+  transform: scale(0.96);
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 input, select, textarea {
@@ -116,7 +128,23 @@ input, select, textarea {
   align-items: center;
 }
 .category-row .name { font-size: 14.5px; }
-.category-row .sub { font-size: 12px; color: var(--ink-soft); margin: 2px 0 0; }
+.category-row .sub {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 2px 0 0;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.category-row .sub:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.edit-error-text {
+  font-size: 11px;
+  color: var(--danger);
+  margin: 4px 0 0;
+  max-width: 160px;
+}
 .category-row .available { font-size: 14.5px; font-weight: 600; white-space: nowrap; }
 
 .progress-track {
@@ -156,6 +184,78 @@ input, select, textarea {
 }
 .month-summary-remaining.over { color: var(--danger); }
 
+.budget-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-soft);
+}
+.budget-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.budget-search input:focus { outline: none; }
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.settings-label { color: var(--ink-soft); }
+.settings-value { font-weight: 500; }
+.settings-signout { margin-top: 0; }
+
+.settings-about {
+  padding: 14px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.settings-about-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.settings-about-text {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.toast-slot {
+  position: fixed;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 50;
+}
+.toast {
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: 0 6px 16px rgba(35, 36, 32, 0.25);
+  max-width: 85%;
+  text-align: center;
+}
+.toast.error {
+  background: var(--danger);
+}
+
 .tab-bar {
   position: sticky;
   bottom: 0;
@@ -181,6 +281,10 @@ input, select, textarea {
   font-weight: 500;
   border-radius: 12px;
 }
+.tab-bar > button:hover:not(.active) {
+  background: var(--bg);
+  color: var(--ink);
+}
 .tab-bar > button.active {
   color: var(--accent);
   background: var(--accent-soft);
@@ -201,9 +305,13 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   box-shadow: 0 6px 16px rgba(47, 111, 94, 0.35);
-  transform: translateY(-14px);
+  /* posição (-14px) e animação de toque agora ficam a cargo do Framer
+     Motion no componente — ver App.jsx — pra não competir com o transform
+     que a lib controla via estilo inline. */
 }
-.fab:active { transform: translateY(-14px) scale(0.96); }
+.fab:hover {
+  box-shadow: 0 8px 20px rgba(47, 111, 94, 0.45);
+}
 
 .tx-row {
   display: flex;
@@ -243,6 +351,7 @@ input, select, textarea {
   font-size: 14px;
   font-weight: 500;
 }
+.secondary-btn:hover { background: var(--bg); border-color: var(--ink-soft); }
 
 .danger-btn {
   flex: 1;
@@ -254,18 +363,21 @@ input, select, textarea {
   font-size: 14px;
   font-weight: 600;
 }
+.danger-btn:hover:not(:disabled) { background: #953d29; }
 .danger-btn:disabled { opacity: 0.6; }
 
 .danger-link-btn {
   width: 100%;
   padding: 12px;
   border: none;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--danger);
   font-size: 14px;
   font-weight: 500;
   margin-top: 8px;
 }
+.danger-link-btn:hover { background: var(--danger-soft); }
 
 .confirm-delete {
   margin-top: 12px;
@@ -273,6 +385,7 @@ input, select, textarea {
   border: 1px solid var(--danger);
   background: var(--danger-soft);
   border-radius: var(--radius);
+  overflow: hidden;
 }
 .confirm-delete p {
   margin: 0 0 12px;
@@ -328,6 +441,7 @@ input, select, textarea {
   font-size: 15px;
   font-weight: 600;
 }
+.primary-btn:hover:not(:disabled) { background: #275c4e; }
 .primary-btn:disabled { opacity: 0.5; cursor: default; }
 
 .combobox-list {
@@ -363,7 +477,7 @@ input, select, textarea {
   font-size: 14.5px;
   color: var(--ink);
 }
-.combobox-option:hover, .combobox-option:focus {
+.combobox-option:hover, .combobox-option:focus-visible {
   background: var(--accent-soft);
 }
 .combobox-empty {
@@ -449,6 +563,7 @@ input, select, textarea {
   font-size: 14px;
   text-align: left;
 }
+.overspend-option:hover:not(.selected) { border-color: var(--ink-soft); }
 .overspend-option.selected {
   border-color: var(--accent);
   background: var(--accent-soft);
@@ -459,10 +574,15 @@ input, select, textarea {
 }
 
 .overspend-actions {
-  padding: 14px 18px 18px;
+  position: sticky;
+  bottom: 0;
+  padding: 14px 18px calc(14px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 10px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 12px rgba(35, 36, 32, 0.06);
 }
 
 .report-filters {
@@ -484,6 +604,7 @@ input, select, textarea {
   font-weight: 500;
   white-space: nowrap;
 }
+.chip:hover:not(.active) { background: var(--bg); border-color: var(--ink-soft); }
 .chip.active {
   background: var(--accent);
   border-color: var(--accent);
@@ -561,7 +682,9 @@ input, select, textarea {
   font-size: 13.5px;
   font-weight: 500;
   width: 100%;
+  text-align: left;
 }
+.report-back:hover { background: var(--accent-soft); }
 
 .report-legend {
   background: var(--surface);

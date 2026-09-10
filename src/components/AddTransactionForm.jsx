@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { supabase } from '../supabaseClient'
 import CategoryPicker from './CategoryPicker'
 import CategoryStatus from './CategoryStatus'
@@ -6,8 +7,10 @@ import CurrencyInput, { centsToAmount } from './CurrencyInput'
 import OverspendWarning from './OverspendWarning'
 import { monthKeyFromDateString } from '../lib/budget'
 import { checkOverspend } from '../lib/overspend'
+import { useToast } from '../lib/ToastContext'
 
-export default function AddTransactionForm({ onSaved }) {
+export default function AddTransactionForm({ onSaved, onCancel }) {
+  const showToast = useToast()
   const [groups, setGroups] = useState([])
   const [categories, setCategories] = useState([])
   const [categoryId, setCategoryId] = useState('')
@@ -68,17 +71,24 @@ export default function AddTransactionForm({ onSaved }) {
     if (overspend) {
       setOverspendInfo(overspend)
     } else {
+      showToast('Lançamento salvo')
       onSaved()
     }
   }
 
   if (overspendInfo) {
     return (
-      <OverspendWarning
-        overspendInfo={overspendInfo}
-        categories={categories}
-        onResolve={() => { setOverspendInfo(null); onSaved() }}
-      />
+      <motion.div
+        initial={{ opacity: 0, x: 16 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+      >
+        <OverspendWarning
+          overspendInfo={overspendInfo}
+          categories={categories}
+          onResolve={() => { setOverspendInfo(null); showToast('Lançamento salvo'); onSaved() }}
+        />
+      </motion.div>
     )
   }
 
@@ -112,8 +122,24 @@ export default function AddTransactionForm({ onSaved }) {
 
       {error && <p className="error-text">{error}</p>}
 
-      <button className="primary-btn" type="submit" disabled={saving}>
+      <motion.button
+        className="primary-btn"
+        type="submit"
+        disabled={saving}
+        whileTap={{ scale: 0.97 }}
+        transition={{ duration: 0.1 }}
+      >
         {saving ? 'Salvando...' : 'Salvar lançamento'}
+      </motion.button>
+
+      <button
+        type="button"
+        className="secondary-btn"
+        onClick={onCancel}
+        disabled={saving}
+        style={{ width: '100%', marginTop: 10 }}
+      >
+        Cancelar
       </button>
     </form>
   )

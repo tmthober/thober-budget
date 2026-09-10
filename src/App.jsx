@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from './supabaseClient'
 import Login from './components/Login'
 import BudgetView from './components/BudgetView'
 import TransactionsView from './components/TransactionsView'
 import AddTransactionForm from './components/AddTransactionForm'
 import ReportsView from './components/ReportsView'
-import { IconBudget, IconList, IconPlus, IconLogout, IconPieChart } from './components/icons'
+import SettingsView from './components/SettingsView'
+import { IconBudget, IconList, IconPlus, IconPieChart, IconSettings } from './components/icons'
 
 export default function App() {
   const [session, setSession] = useState(null)
   const [checkingSession, setCheckingSession] = useState(true)
   const [tab, setTab] = useState('budget')
+  const [previousTab, setPreviousTab] = useState('budget')
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -27,6 +30,11 @@ export default function App() {
   if (checkingSession) return null
   if (!session) return <Login />
 
+  function openAdd() {
+    setPreviousTab(tab)
+    setTab('add')
+  }
+
   function handleTransactionSaved() {
     setRefreshKey((k) => k + 1)
     setTab('transactions')
@@ -36,16 +44,26 @@ export default function App() {
     <>
       <header className="app-header">
         <h1>Orçamento familiar</h1>
-        <button className="icon-btn" onClick={() => supabase.auth.signOut()} aria-label="Sair">
-          <IconLogout />
-        </button>
       </header>
 
       <div className="content">
-        {tab === 'budget' && <BudgetView refreshKey={refreshKey} />}
-        {tab === 'reports' && <ReportsView />}
-        {tab === 'transactions' && <TransactionsView refreshKey={refreshKey} />}
-        {tab === 'add' && <AddTransactionForm onSaved={handleTransactionSaved} />}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
+            {tab === 'budget' && <BudgetView refreshKey={refreshKey} />}
+            {tab === 'reports' && <ReportsView />}
+            {tab === 'transactions' && <TransactionsView refreshKey={refreshKey} />}
+            {tab === 'add' && (
+              <AddTransactionForm onSaved={handleTransactionSaved} onCancel={() => setTab(previousTab)} />
+            )}
+            {tab === 'settings' && <SettingsView />}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <nav className="tab-bar">
@@ -70,13 +88,17 @@ export default function App() {
         </button>
 
         <div className="tab-bar-fab-slot">
-          <button
+          <motion.button
             className="fab"
-            onClick={() => setTab('add')}
+            onClick={openAdd}
             aria-label="Lançar despesa"
+            style={{ y: -14 }}
+            whileHover={{ y: -16, scale: 1.05 }}
+            whileTap={{ y: -14, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
             <IconPlus />
-          </button>
+          </motion.button>
         </div>
 
         <button
@@ -87,6 +109,16 @@ export default function App() {
         >
           <IconList />
           <span>Transações</span>
+        </button>
+
+        <button
+          className={tab === 'settings' ? 'active' : ''}
+          onClick={() => setTab('settings')}
+          aria-label="Configurações"
+          aria-current={tab === 'settings' ? 'page' : undefined}
+        >
+          <IconSettings />
+          <span>Menu</span>
         </button>
       </nav>
     </>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../supabaseClient'
 import CategoryPicker from './CategoryPicker'
 import CategoryStatus from './CategoryStatus'
@@ -7,8 +8,10 @@ import OverspendWarning from './OverspendWarning'
 import { IconChevronLeft } from './icons'
 import { monthKeyFromDateString } from '../lib/budget'
 import { checkOverspend } from '../lib/overspend'
+import { useToast } from '../lib/ToastContext'
 
 export default function EditTransactionForm({ transaction, onBack, onSaved, onDeleted }) {
+  const showToast = useToast()
   const [groups, setGroups] = useState([])
   const [categories, setCategories] = useState([])
   const [categoryId, setCategoryId] = useState(transaction.category_id)
@@ -70,6 +73,7 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
     if (overspend) {
       setOverspendInfo(overspend)
     } else {
+      showToast('Alterações salvas')
       onSaved()
     }
   }
@@ -85,16 +89,23 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
       setError('Não foi possível excluir. Tente novamente.')
       return
     }
+    showToast('Lançamento excluído')
     onDeleted()
   }
 
   if (overspendInfo) {
     return (
-      <OverspendWarning
-        overspendInfo={overspendInfo}
-        categories={categories}
-        onResolve={() => { setOverspendInfo(null); onSaved() }}
-      />
+      <motion.div
+        initial={{ opacity: 0, x: 16 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+      >
+        <OverspendWarning
+          overspendInfo={overspendInfo}
+          categories={categories}
+          onResolve={() => { setOverspendInfo(null); showToast('Alterações salvas'); onSaved() }}
+        />
+      </motion.div>
     )
   }
 
@@ -137,32 +148,52 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
 
         {error && <p className="error-text">{error}</p>}
 
-        <button className="primary-btn" type="submit" disabled={saving || deleting}>
+        <motion.button
+          className="primary-btn"
+          type="submit"
+          disabled={saving || deleting}
+          whileTap={{ scale: 0.97 }}
+          transition={{ duration: 0.1 }}
+        >
           {saving ? 'Salvando...' : 'Salvar alterações'}
-        </button>
+        </motion.button>
 
-        {!confirmingDelete ? (
-          <button
-            type="button"
-            className="danger-link-btn"
-            onClick={() => setConfirmingDelete(true)}
-            disabled={saving || deleting}
-          >
-            Excluir lançamento
-          </button>
-        ) : (
-          <div className="confirm-delete">
-            <p>Excluir este lançamento? Não dá pra desfazer.</p>
-            <div className="confirm-delete-actions">
-              <button type="button" className="secondary-btn" onClick={() => setConfirmingDelete(false)}>
-                Cancelar
-              </button>
-              <button type="button" className="danger-btn" onClick={handleDelete} disabled={deleting}>
-                {deleting ? 'Excluindo...' : 'Sim, excluir'}
-              </button>
-            </div>
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {!confirmingDelete ? (
+            <motion.button
+              key="ask"
+              type="button"
+              className="danger-link-btn"
+              onClick={() => setConfirmingDelete(true)}
+              disabled={saving || deleting}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+            >
+              Excluir lançamento
+            </motion.button>
+          ) : (
+            <motion.div
+              key="confirm"
+              className="confirm-delete"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              <p>Excluir este lançamento? Não dá pra desfazer.</p>
+              <div className="confirm-delete-actions">
+                <button type="button" className="secondary-btn" onClick={() => setConfirmingDelete(false)}>
+                  Cancelar
+                </button>
+                <button type="button" className="danger-btn" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? 'Excluindo...' : 'Sim, excluir'}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </form>
     </div>
   )
