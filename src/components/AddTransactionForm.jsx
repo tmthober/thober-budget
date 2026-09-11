@@ -79,8 +79,8 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
   if (overspendInfo) {
     return (
       <motion.div
-        initial={{ opacity: 0, x: 16 }}
-        animate={{ opacity: 1, x: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
       >
         <OverspendWarning

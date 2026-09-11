@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../supabaseClient'
-import { formatCurrency } from '../lib/budget'
+import { formatCurrency, addMonths, toMonthKey } from '../lib/budget'
 import { computeCategorySummaries } from '../lib/budget'
+import { parseDateStr } from '../lib/reports'
 import { moveBudgetedAmount } from '../lib/overspend'
+import { fetchOverspendMoves, summarizeOverspendMoves } from '../lib/overspendHistory'
 import CurrencyInput, { amountToCents, centsToAmount } from './CurrencyInput'
+
+const HISTORY_WINDOW_MONTHS = 3
 
 export default function OverspendWarning({ overspendInfo, categories, onResolve }) {
   const { category, monthKey, overspentAmount } = overspendInfo
   const [budgetEntries, setBudgetEntries] = useState([])
   const [transactions, setTransactions] = useState([])
+  const [overspendStats, setOverspendStats] = useState({})
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState(null)
   const [amountCents, setAmountCents] = useState(amountToCents(overspentAmount))
@@ -18,16 +23,19 @@ export default function OverspendWarning({ overspendInfo, categories, onResolve 
 
   useEffect(() => {
     async function load() {
-      const [b, t] = await Promise.all([
+      const historyStartKey = toMonthKey(addMonths(parseDateStr(monthKey), -(HISTORY_WINDOW_MONTHS - 1)))
+      const [b, t, history] = await Promise.all([
         supabase.from('budget_entries').select('*'),
         supabase.from('transactions').select('*'),
+        fetchOverspendMoves(historyStartKey, monthKey),
       ])
       setBudgetEntries(b.data ?? [])
       setTransactions(t.data ?? [])
+      setOverspendStats(summarizeOverspendMoves(history.moves))
       setLoading(false)
     }
     load()
-  }, [])
+  }, [monthKey])
 
   if (loading) return <div className="empty-state">Carregando categorias...</div>
 
@@ -35,6 +43,10 @@ export default function OverspendWarning({ overspendInfo, categories, onResolve 
   const options = summaries
     .filter((c) => c.id !== category.id && !c.is_income && c.available > 0)
     .sort((a, b) => b.available - a.available)
+
+  // Quantas vezes ANTES desta a categoria já precisou de cobertura, nos
+  // últimos meses (o movimento atual ainda não foi gravado nesse ponto).
+  const priorOverspentCount = overspendStats[category.id]?.overspentMonths.size ?? 0
 
   function handleSelect(cat) {
     setSelectedId(cat.id)
@@ -70,6 +82,13 @@ export default function OverspendWarning({ overspendInfo, categories, onResolve 
           Você estourou {formatCurrency(overspentAmount)} do orçado nessa categoria. De qual
           categoria quer cobrir a diferença?
         </p>
+        {priorOverspentCount >= 1 && (
+          <p className="overspend-pattern-note">
+            📊 Essa já é a {priorOverspentCount + 1}ª vez nos últimos {HISTORY_WINDOW_MONTHS} meses que
+            {' '}{category.name} precisa de cobertura — talvez valha aumentar o orçado dela de vez,
+            na tela de Orçamento.
+          </p>
+        )}
       </div>
 
       {options.length === 0 ? (
@@ -79,17 +98,27 @@ export default function OverspendWarning({ overspendInfo, categories, onResolve 
         </p>
       ) : (
         <div className="overspend-options">
-          {options.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              className={`overspend-option ${selectedId === opt.id ? 'selected' : ''}`}
-              onClick={() => handleSelect(opt)}
-            >
-              <span>{opt.name}</span>
-              <span className="overspend-option-available">{formatCurrency(opt.available)}</span>
-            </button>
-          ))}
+          {options.map((opt) => {
+            const lentCount = overspendStats[opt.id]?.lentMonths.size ?? 0
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className={`overspend-option ${selectedId === opt.id ? 'selected' : ''}`}
+                onClick={() => handleSelect(opt)}
+              >
+                <span>
+                  {opt.name}
+                  {lentCount >= 2 && (
+                    <span className="overspend-option-note">
+                      💸 já emprestou {lentCount}x nos últimos {HISTORY_WINDOW_MONTHS} meses
+                    </span>
+                  )}
+                </span>
+                <span className="overspend-option-available">{formatCurrency(opt.available)}</span>
+              </button>
+            )
+          })}
         </div>
       )}
 

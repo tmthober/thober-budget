@@ -72,5 +72,19 @@ export async function moveBudgetedAmount(fromCategoryId, toCategoryId, monthKey,
     { onConflict: 'category_id,month' }
   )
 
-  return { error: writeError }
+  if (writeError) {
+    return { error: writeError }
+  }
+
+  // Registra o histórico do movimento — não afeta o orçado em si (já feito
+  // acima), só permite identificar depois quais categorias vivem estourando
+  // e quais vivem emprestando dinheiro. Falha aqui não desfaz o movimento.
+  await supabase.from('overspend_moves').insert({
+    month: monthKey,
+    from_category_id: fromCategoryId,
+    to_category_id: toCategoryId,
+    amount,
+  })
+
+  return { error: null }
 }

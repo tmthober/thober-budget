@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { formatCurrency } from '../lib/budget'
+import { formatCurrency, monthKeyFromDateString } from '../lib/budget'
 import { presetRange, previousPeriod, aggregateSpending, formatDateStr } from '../lib/reports'
+import { summarizeOverspendMoves } from '../lib/overspendHistory'
 import PieChart, { PALETTE } from './PieChart'
 import { IconChevronLeft } from './icons'
 
@@ -21,6 +22,7 @@ export default function ReportsView() {
   const [categories, setCategories] = useState([])
   const [groups, setGroups] = useState([])
   const [transactions, setTransactions] = useState([])
+  const [overspendMoves, setOverspendMoves] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState(null)
@@ -28,12 +30,13 @@ export default function ReportsView() {
   async function load() {
     setLoading(true)
     setLoadError(false)
-    const [c, g, t] = await Promise.all([
+    const [c, g, t, m] = await Promise.all([
       supabase.from('categories').select('*'),
       supabase.from('category_groups').select('*'),
       supabase.from('transactions').select('*'),
+      supabase.from('overspend_moves').select('*'),
     ])
-    if (c.error || g.error || t.error) {
+    if (c.error || g.error || t.error || m.error) {
       setLoadError(true)
       setLoading(false)
       return
@@ -41,6 +44,7 @@ export default function ReportsView() {
     setCategories(c.data ?? [])
     setGroups(g.data ?? [])
     setTransactions(t.data ?? [])
+    setOverspendMoves(m.data ?? [])
     setLoading(false)
   }
 
@@ -89,6 +93,26 @@ export default function ReportsView() {
     ? byCategory.filter((c) => c.groupId === selectedGroupId)
     : byGroup
   const pieTotal = pieData.reduce((sum, s) => sum + s.amount, 0)
+
+  // Movimentos de "cobrir estouro" dentro do período selecionado (por mês,
+  // já que o registro é mensal — funciona bem mesmo com range personalizado).
+  const rangeStartMonth = monthKeyFromDateString(range.start)
+  const rangeEndMonth = monthKeyFromDateString(range.end)
+  const movesInRange = overspendMoves.filter(
+    (m) => m.month >= rangeStartMonth && m.month <= rangeEndMonth
+  )
+  const overspendStats = summarizeOverspendMoves(movesInRange)
+  const categoriesById = Object.fromEntries(categories.map((c) => [c.id, c]))
+
+  const mostOverspent = Object.entries(overspendStats)
+    .map(([id, s]) => ({ id, name: categoriesById[id]?.name ?? 'Categoria removida', count: s.overspentMonths.size, total: s.totalReceived }))
+    .filter((c) => c.count > 0)
+    .sort((a, b) => b.count - a.count)
+
+  const mostLent = Object.entries(overspendStats)
+    .map(([id, s]) => ({ id, name: categoriesById[id]?.name ?? 'Categoria removida', count: s.lentMonths.size, total: s.totalLent }))
+    .filter((c) => c.count > 0)
+    .sort((a, b) => b.count - a.count)
 
   return (
     <div>
@@ -169,6 +193,36 @@ export default function ReportsView() {
                   </div>
                 ))}
               </div>
+            </>
+          )}
+        </>
+      )}
+
+      <p className="group-title"><span>Estouros e coberturas</span></p>
+      {mostOverspent.length === 0 && mostLent.length === 0 ? (
+        <p className="empty-state">Nenhum estouro coberto nesse período.</p>
+      ) : (
+        <>
+          {mostOverspent.length > 0 && (
+            <>
+              <p className="report-subheading">Precisaram de cobertura</p>
+              {mostOverspent.map((c) => (
+                <div className="report-category-row" key={c.id}>
+                  <span className="name">⚠️ {c.name}</span>
+                  <span className="amt">{c.count}x · {formatCurrency(c.total)}</span>
+                </div>
+              ))}
+            </>
+          )}
+          {mostLent.length > 0 && (
+            <>
+              <p className="report-subheading">Emprestaram dinheiro</p>
+              {mostLent.map((c) => (
+                <div className="report-category-row" key={c.id}>
+                  <span className="name">💸 {c.name}</span>
+                  <span className="amt">{c.count}x · {formatCurrency(c.total)}</span>
+                </div>
+              ))}
             </>
           )}
         </>

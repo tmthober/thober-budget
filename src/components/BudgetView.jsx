@@ -5,7 +5,10 @@ import {
   formatCurrency, formatMonthLabel, addMonths, toMonthKey,
   computeCategorySummaries, computeToBeBudgeted,
 } from '../lib/budget'
+import { fetchOverspendMoves, summarizeOverspendMoves } from '../lib/overspendHistory'
 import { useToast } from '../lib/ToastContext'
+
+const HISTORY_WINDOW_MONTHS = 3
 
 export default function BudgetView({ refreshKey }) {
   const showToast = useToast()
@@ -14,6 +17,7 @@ export default function BudgetView({ refreshKey }) {
   const [categories, setCategories] = useState([])
   const [budgetEntries, setBudgetEntries] = useState([])
   const [transactions, setTransactions] = useState([])
+  const [overspendStats, setOverspendStats] = useState({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -22,6 +26,7 @@ export default function BudgetView({ refreshKey }) {
   const [search, setSearch] = useState('')
 
   const monthKey = toMonthKey(month)
+  const historyStartKey = toMonthKey(addMonths(month, -(HISTORY_WINDOW_MONTHS - 1)))
 
   async function loadData() {
     setLoading(true)
@@ -41,10 +46,14 @@ export default function BudgetView({ refreshKey }) {
     setCategories(c.data ?? [])
     setBudgetEntries(b.data ?? [])
     setTransactions(t.data ?? [])
+
+    const { moves } = await fetchOverspendMoves(historyStartKey, monthKey)
+    setOverspendStats(summarizeOverspendMoves(moves))
+
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [refreshKey])
+  useEffect(() => { loadData() }, [refreshKey, monthKey])
 
   if (loading) return <div className="empty-state">Carregando orçamento...</div>
 
@@ -171,6 +180,9 @@ export default function BudgetView({ refreshKey }) {
                   ? Math.min((cat.activityThisMonth / cat.budgetedThisMonth) * 100, 100)
                   : (cat.activityThisMonth > 0 ? 100 : 0)
                 const catOverBudget = cat.activityThisMonth > cat.budgetedThisMonth && cat.budgetedThisMonth > 0
+                const hist = overspendStats[cat.id]
+                const overspentCount = hist?.overspentMonths.size ?? 0
+                const lentCount = hist?.lentMonths.size ?? 0
                 return (
                   <div className="category-row" key={cat.id}>
                     <div className="category-row-top">
@@ -214,6 +226,16 @@ export default function BudgetView({ refreshKey }) {
                           }}
                         />
                       </div>
+                    )}
+                    {overspentCount >= 2 && (
+                      <p className="history-badge warn">
+                        ⚠️ Precisou de cobertura em {overspentCount} dos últimos {HISTORY_WINDOW_MONTHS} meses
+                      </p>
+                    )}
+                    {lentCount >= 2 && (
+                      <p className="history-badge info">
+                        💸 Emprestou dinheiro pra outras categorias em {lentCount} dos últimos {HISTORY_WINDOW_MONTHS} meses
+                      </p>
                     )}
                   </div>
                 )
