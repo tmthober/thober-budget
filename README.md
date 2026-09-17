@@ -104,7 +104,6 @@ detalhado (Supabase, GitHub, variáveis de ambiente e GitHub Pages).
 - [ ] Registrar quem lançou cada transação
 - [ ] Captura automática de notificações de banco/carteira digital (fila de
       "para categorizar")
-- [ ] Gráficos de gasto por categoria/mês
 
 ## Licença
 
