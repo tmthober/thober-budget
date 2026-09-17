@@ -145,6 +145,18 @@ input, select, textarea {
   margin: 4px 0 0;
   max-width: 160px;
 }
+.cover-overspend-btn {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--danger);
+  border-radius: 999px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.cover-overspend-btn:hover { background: var(--danger); color: #fff; }
 .history-badge {
   font-size: 11.5px;
   margin: 6px 0 0;

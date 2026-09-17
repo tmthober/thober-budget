@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { supabase } from '../supabaseClient'
 import { IconChevronLeft, IconChevronRight, IconSearch } from './icons'
 import {
@@ -7,6 +8,7 @@ import {
 } from '../lib/budget'
 import { fetchOverspendMoves, summarizeOverspendMoves } from '../lib/overspendHistory'
 import { useToast } from '../lib/ToastContext'
+import OverspendWarning from './OverspendWarning'
 
 const HISTORY_WINDOW_MONTHS = 3
 
@@ -24,6 +26,7 @@ export default function BudgetView({ refreshKey }) {
   const [editValue, setEditValue] = useState('')
   const [editError, setEditError] = useState(null)
   const [search, setSearch] = useState('')
+  const [overspendTarget, setOverspendTarget] = useState(null)
 
   const monthKey = toMonthKey(month)
   const historyStartKey = toMonthKey(addMonths(month, -(HISTORY_WINDOW_MONTHS - 1)))
@@ -73,6 +76,26 @@ export default function BudgetView({ refreshKey }) {
   const summaries = computeCategorySummaries(categories, budgetEntries, transactions, monthKey)
   const toBeBudgeted = computeToBeBudgeted(categories, budgetEntries, transactions, monthKey)
 
+  if (overspendTarget) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+      >
+        <OverspendWarning
+          overspendInfo={overspendTarget}
+          categories={categories}
+          onResolve={() => {
+            setOverspendTarget(null)
+            showToast('Orçamento atualizado')
+            loadData()
+          }}
+        />
+      </motion.div>
+    )
+  }
+
   const expenseSummaries = summaries.filter((s) => s.group_id !== incomeGroup?.id)
   const totalBudgetedThisMonth = expenseSummaries.reduce((sum, s) => sum + s.budgetedThisMonth, 0)
   const totalActivityThisMonth = expenseSummaries.reduce((sum, s) => sum + s.activityThisMonth, 0)
@@ -109,6 +132,14 @@ export default function BudgetView({ refreshKey }) {
     setEditError(null)
     showToast('Orçamento atualizado')
     loadData()
+  }
+
+  function openCoverOverspend(cat) {
+    setOverspendTarget({
+      category: cat,
+      monthKey,
+      overspentAmount: Math.abs(cat.available),
+    })
   }
 
   return (
@@ -183,6 +214,7 @@ export default function BudgetView({ refreshKey }) {
                 const hist = overspendStats[cat.id]
                 const overspentCount = hist?.overspentMonths.size ?? 0
                 const lentCount = hist?.lentMonths.size ?? 0
+                const isNegative = cat.available < 0
                 return (
                   <div className="category-row" key={cat.id}>
                     <div className="category-row-top">
@@ -211,7 +243,7 @@ export default function BudgetView({ refreshKey }) {
                         )}
                       </div>
                       <span className="available" style={{
-                        color: cat.available < 0 ? 'var(--danger)' : cat.available === 0 ? 'var(--ink-soft)' : 'var(--accent)',
+                        color: isNegative ? 'var(--danger)' : cat.available === 0 ? 'var(--ink-soft)' : 'var(--accent)',
                       }}>
                         {formatCurrency(cat.available)}
                       </span>
@@ -226,6 +258,15 @@ export default function BudgetView({ refreshKey }) {
                           }}
                         />
                       </div>
+                    )}
+                    {isNegative && (
+                      <button
+                        type="button"
+                        className="cover-overspend-btn"
+                        onClick={() => openCoverOverspend(cat)}
+                      >
+                        Cobrir estouro →
+                      </button>
                     )}
                     {overspentCount >= 2 && (
                       <p className="history-badge warn">
