@@ -27,6 +27,11 @@ export default function BudgetView({ refreshKey }) {
   const [editError, setEditError] = useState(null)
   const [search, setSearch] = useState('')
   const [overspendTarget, setOverspendTarget] = useState(null)
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategoryGroupId, setNewCategoryGroupId] = useState('')
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [addCategoryError, setAddCategoryError] = useState(null)
+  const [savingCategory, setSavingCategory] = useState(false)
 
   const monthKey = toMonthKey(month)
   const historyStartKey = toMonthKey(addMonths(month, -(HISTORY_WINDOW_MONTHS - 1)))
@@ -142,8 +147,109 @@ export default function BudgetView({ refreshKey }) {
     })
   }
 
+  function startAddCategory() {
+    setAddingCategory(true)
+    setNewCategoryGroupId(expenseGroups[0]?.id ?? '')
+    setNewCategoryName('')
+    setAddCategoryError(null)
+  }
+
+  function cancelAddCategory() {
+    setAddingCategory(false)
+    setNewCategoryName('')
+    setAddCategoryError(null)
+  }
+
+  async function saveNewCategory() {
+    const name = newCategoryName.trim()
+    if (!newCategoryGroupId) {
+      setAddCategoryError('Escolha um grupo.')
+      return
+    }
+    if (!name) {
+      setAddCategoryError('Digite um nome para a categoria.')
+      return
+    }
+    setSavingCategory(true)
+    const catsInGroup = categories.filter((c) => c.group_id === newCategoryGroupId)
+    const nextSortOrder = catsInGroup.length > 0
+      ? Math.max(...catsInGroup.map((c) => c.sort_order)) + 1
+      : 0
+    const { error } = await supabase.from('categories').insert({
+      group_id: newCategoryGroupId,
+      name,
+      sort_order: nextSortOrder,
+      is_income: false,
+    })
+    setSavingCategory(false)
+    if (error) {
+      setAddCategoryError('Não foi possível salvar. Verifique sua internet e tente de novo.')
+      return
+    }
+    setAddingCategory(false)
+    setNewCategoryName('')
+    setAddCategoryError(null)
+    showToast('Categoria adicionada')
+    loadData()
+  }
+
   return (
     <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={startAddCategory}
+          aria-label="Adicionar categoria"
+        >
+          <span style={{ fontSize: 20, fontWeight: 600, lineHeight: 1 }}>+</span>
+        </button>
+      </div>
+
+      {addingCategory && (
+        <div className="category-row" style={{ marginBottom: 16 }}>
+          <p className="name" style={{ marginBottom: 8 }}>Nova categoria</p>
+          <select
+            value={newCategoryGroupId}
+            onChange={(e) => setNewCategoryGroupId(e.target.value)}
+            style={{ width: '100%', padding: '6px 8px', marginBottom: 8 }}
+          >
+            {expenseGroups.map((g) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
+          <input
+            autoFocus
+            value={newCategoryName}
+            onChange={(e) => setNewCategoryName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && saveNewCategory()}
+            placeholder="Nome da categoria"
+            style={{ width: '100%', padding: '6px 8px' }}
+          />
+          {addCategoryError && (
+            <p className="edit-error-text">{addCategoryError}</p>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={saveNewCategory}
+              disabled={savingCategory}
+            >
+              Salvar
+            </button>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={cancelAddCategory}
+              disabled={savingCategory}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="month-nav">
         <button className="icon-btn" onClick={() => setMonth(addMonths(month, -1))} aria-label="Mês anterior">
           <IconChevronLeft />
