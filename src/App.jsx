@@ -8,7 +8,7 @@ import AddTransactionForm from './components/AddTransactionForm'
 import ReportsView from './components/ReportsView'
 import AssistantView from './components/AssistantView'
 import SettingsView from './components/SettingsView'
-import { IconBudget, IconList, IconPlus, IconPieChart, IconSettings } from './components/icons'
+import { IconBudget, IconList, IconPlus, IconPieChart, IconSettings, IconAssistant } from './components/icons'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -98,7 +98,7 @@ export default function App() {
           aria-label="Assistente"
           aria-current={tab === 'assistant' ? 'page' : undefined}
         >
-          <span style={{ fontSize: '1.2em' }}>✨</span>
+          <IconAssistant />
           <span>Assistente</span>
         </button>
 
