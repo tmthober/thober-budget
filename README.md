@@ -1,4 +1,4 @@
-# Orçamento Familiar
+# Orçamento Familiar - Economea$y
 
 App de controle financeiro pessoal no método de orçamento por envelopes
 (o mesmo princípio do YNAB — *You Need A Budget*): toda categoria recebe um
