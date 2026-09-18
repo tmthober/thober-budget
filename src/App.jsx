@@ -6,6 +6,7 @@ import BudgetView from './components/BudgetView'
 import TransactionsView from './components/TransactionsView'
 import AddTransactionForm from './components/AddTransactionForm'
 import ReportsView from './components/ReportsView'
+import AssistantView from './components/AssistantView'
 import SettingsView from './components/SettingsView'
 import { IconBudget, IconList, IconPlus, IconPieChart, IconSettings } from './components/icons'
 
@@ -29,6 +30,9 @@ export default function App() {
 
   if (checkingSession) return null
   if (!session) return <Login />
+
+  // Mês visível (YYYY-MM), calculado na data local
+  const month = new Date().toISOString().slice(0, 7)
 
   function openAdd() {
     setPreviousTab(tab)
@@ -57,6 +61,7 @@ export default function App() {
           >
             {tab === 'budget' && <BudgetView refreshKey={refreshKey} />}
             {tab === 'reports' && <ReportsView />}
+            {tab === 'assistant' && <AssistantView month={month} />}
             {tab === 'transactions' && <TransactionsView refreshKey={refreshKey} />}
             {tab === 'add' && (
               <AddTransactionForm onSaved={handleTransactionSaved} onCancel={() => setTab(previousTab)} />
@@ -85,6 +90,16 @@ export default function App() {
         >
           <IconPieChart />
           <span>Relatórios</span>
+        </button>
+
+        <button
+          className={tab === 'assistant' ? 'active' : ''}
+          onClick={() => setTab('assistant')}
+          aria-label="Assistente"
+          aria-current={tab === 'assistant' ? 'page' : undefined}
+        >
+          <span style={{ fontSize: '1.2em' }}>✨</span>
+          <span>Assistente</span>
         </button>
 
         <div className="tab-bar-fab-slot">
