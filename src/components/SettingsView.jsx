@@ -1,14 +1,30 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
-export default function SettingsView() {
+export default function SettingsView({ aboutOnly = false }) {
   const [email, setEmail] = useState('')
 
   useEffect(() => {
+    if (aboutOnly) return
     supabase.auth.getUser().then(({ data }) => {
       setEmail(data?.user?.email ?? '')
     })
-  }, [])
+  }, [aboutOnly])
+
+  if (aboutOnly) {
+    return (
+      <div>
+        <p className="group-title"><span>Sobre</span></p>
+        <div className="settings-about">
+          <p className="settings-about-title">Orçamento Familiar</p>
+          <p className="settings-about-text">
+            App de orçamento por envelopes (método parecido com o YNAB), feito sob medida pra
+            uso da família — sem contas separadas nem controle por pessoa nesta versão.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -22,15 +38,6 @@ export default function SettingsView() {
       <button className="danger-link-btn settings-signout" onClick={() => supabase.auth.signOut()}>
         Sair
       </button>
-
-      <p className="group-title"><span>Sobre</span></p>
-      <div className="settings-about">
-        <p className="settings-about-title">Orçamento Familiar</p>
-        <p className="settings-about-text">
-          App de orçamento por envelopes (método parecido com o YNAB), feito sob medida pra
-          uso da família — sem contas separadas nem controle por pessoa nesta versão.
-        </p>
-      </div>
     </div>
   )
 }

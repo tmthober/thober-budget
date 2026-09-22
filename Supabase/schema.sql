@@ -38,12 +38,27 @@ create table transactions (
   created_at timestamptz not null default now()
 );
 
+-- Histórico de "cobrir estouro": toda vez que dinheiro é movido de uma
+-- categoria pra outra pra cobrir um gasto que passou do orçado. Não afeta
+-- o cálculo de orçado/disponível (isso continua em budget_entries) — serve
+-- só pra identificar categorias que estouram com frequência (ou que vivem
+-- emprestando dinheiro pras outras).
+create table overspend_moves (
+  id uuid primary key default gen_random_uuid(),
+  month date not null,
+  from_category_id uuid not null references categories(id),
+  to_category_id uuid not null references categories(id),
+  amount numeric(12, 2) not null,
+  created_at timestamptz not null default now()
+);
+
 -- Row Level Security: qualquer usuário autenticado (você e sua esposa) pode ler/escrever tudo.
 -- Isso é suficiente para um app privado de uso familiar com 2 contas.
 alter table category_groups enable row level security;
 alter table categories enable row level security;
 alter table budget_entries enable row level security;
 alter table transactions enable row level security;
+alter table overspend_moves enable row level security;
 
 create policy "authenticated read/write" on category_groups
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -52,6 +67,8 @@ create policy "authenticated read/write" on categories
 create policy "authenticated read/write" on budget_entries
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "authenticated read/write" on transactions
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "authenticated read/write" on overspend_moves
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ---------------------------------------------------------------------

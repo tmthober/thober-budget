@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from './supabaseClient'
 import Login from './components/Login'
@@ -8,7 +8,19 @@ import AddTransactionForm from './components/AddTransactionForm'
 import ReportsView from './components/ReportsView'
 import AssistantView from './components/AssistantView'
 import SettingsView from './components/SettingsView'
-import { IconBudget, IconList, IconPlus, IconPieChart, IconSettings, IconAssistant } from './components/icons'
+import AppHeader from './components/AppHeader'
+import AccountDrawer from './components/AccountDrawer'
+import { IconBudget, IconList, IconPlus, IconPieChart, IconAssistant } from './components/icons'
+
+const TAB_TITLES = {
+  budget: 'Orçamento',
+  transactions: 'Transações',
+  add: 'Nova transação',
+  reports: 'Relatórios',
+  assistant: 'Assistente',
+  settings: 'Configurações',
+  about: 'Sobre',
+}
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -16,6 +28,12 @@ export default function App() {
   const [tab, setTab] = useState('budget')
   const [previousTab, setPreviousTab] = useState('budget')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [email, setEmail] = useState('')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [headerHidden, setHeaderHidden] = useState(false)
+
+  const contentRef = useRef(null)
+  const lastScrollY = useRef(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -27,6 +45,30 @@ export default function App() {
     })
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!session) return
+    supabase.auth.getUser().then(({ data }) => {
+      setEmail(data?.user?.email ?? '')
+    })
+  }, [session])
+
+  // Header some ao rolar pra baixo, reaparece ao rolar pra cima.
+  // Reseta (mostra) sempre que a aba muda, já que cada tela volta ao topo.
+  useEffect(() => {
+    setHeaderHidden(false)
+    lastScrollY.current = 0
+    if (contentRef.current) contentRef.current.scrollTop = 0
+  }, [tab])
+
+  function handleScroll(e) {
+    const y = e.target.scrollTop
+    const goingDown = y > lastScrollY.current
+    const pastThreshold = y > 24
+    if (goingDown && pastThreshold) setHeaderHidden(true)
+    else if (!goingDown) setHeaderHidden(false)
+    lastScrollY.current = y
+  }
 
   if (checkingSession) return null
   if (!session) return <Login />
@@ -44,13 +86,25 @@ export default function App() {
     setTab('transactions')
   }
 
+  function handleDrawerNavigate(destination) {
+    setDrawerOpen(false)
+    setPreviousTab(tab === 'settings' || tab === 'about' ? previousTab : tab)
+    setTab(destination)
+  }
+
+  const mainTabs = ['budget', 'transactions', 'reports', 'assistant']
+  const activeBottomTab = mainTabs.includes(tab) ? tab : null
+
   return (
     <>
-      <header className="app-header">
-        <h1>Orçamento familiar</h1>
-      </header>
+      <AppHeader
+        title={TAB_TITLES[tab] || 'Orçamento familiar'}
+        email={email}
+        hidden={headerHidden}
+        onAvatarClick={() => setDrawerOpen(true)}
+      />
 
-      <div className="content">
+      <div className="content" ref={contentRef} onScroll={handleScroll}>
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}
@@ -67,39 +121,30 @@ export default function App() {
               <AddTransactionForm onSaved={handleTransactionSaved} onCancel={() => setTab(previousTab)} />
             )}
             {tab === 'settings' && <SettingsView />}
+            {tab === 'about' && <SettingsView aboutOnly />}
           </motion.div>
         </AnimatePresence>
       </div>
 
       <nav className="tab-bar">
         <button
-          className={tab === 'budget' ? 'active' : ''}
+          className={activeBottomTab === 'budget' ? 'active' : ''}
           onClick={() => setTab('budget')}
           aria-label="Orçamento"
-          aria-current={tab === 'budget' ? 'page' : undefined}
+          aria-current={activeBottomTab === 'budget' ? 'page' : undefined}
         >
           <IconBudget />
           <span>Orçamento</span>
         </button>
 
         <button
-          className={tab === 'reports' ? 'active' : ''}
-          onClick={() => setTab('reports')}
-          aria-label="Relatórios"
-          aria-current={tab === 'reports' ? 'page' : undefined}
+          className={activeBottomTab === 'transactions' ? 'active' : ''}
+          onClick={() => setTab('transactions')}
+          aria-label="Transações"
+          aria-current={activeBottomTab === 'transactions' ? 'page' : undefined}
         >
-          <IconPieChart />
-          <span>Relatórios</span>
-        </button>
-
-        <button
-          className={tab === 'assistant' ? 'active' : ''}
-          onClick={() => setTab('assistant')}
-          aria-label="Assistente"
-          aria-current={tab === 'assistant' ? 'page' : undefined}
-        >
-          <IconAssistant />
-          <span>Assistente</span>
+          <IconList />
+          <span>Transações</span>
         </button>
 
         <div className="tab-bar-fab-slot">
@@ -117,25 +162,32 @@ export default function App() {
         </div>
 
         <button
-          className={tab === 'transactions' ? 'active' : ''}
-          onClick={() => setTab('transactions')}
-          aria-label="Transações"
-          aria-current={tab === 'transactions' ? 'page' : undefined}
+          className={activeBottomTab === 'reports' ? 'active' : ''}
+          onClick={() => setTab('reports')}
+          aria-label="Relatórios"
+          aria-current={activeBottomTab === 'reports' ? 'page' : undefined}
         >
-          <IconList />
-          <span>Transações</span>
+          <IconPieChart />
+          <span>Relatórios</span>
         </button>
 
         <button
-          className={tab === 'settings' ? 'active' : ''}
-          onClick={() => setTab('settings')}
-          aria-label="Configurações"
-          aria-current={tab === 'settings' ? 'page' : undefined}
+          className={activeBottomTab === 'assistant' ? 'active' : ''}
+          onClick={() => setTab('assistant')}
+          aria-label="Assistente"
+          aria-current={activeBottomTab === 'assistant' ? 'page' : undefined}
         >
-          <IconSettings />
-          <span>Menu</span>
+          <IconAssistant />
+          <span>Assistente</span>
         </button>
       </nav>
+
+      <AccountDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        email={email}
+        onNavigate={handleDrawerNavigate}
+      />
     </>
   )
 }

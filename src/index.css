@@ -51,10 +51,18 @@ input, select, textarea {
 }
 
 .app-header {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 14px 18px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -63,6 +71,30 @@ input, select, textarea {
   font-size: 17px;
   font-weight: 600;
   margin: 0;
+}
+
+.drawer-avatar {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.drawer-avatar:hover { filter: brightness(0.96); }
+.drawer-avatar-lg {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  font-size: 18px;
 }
 
 .icon-btn {
@@ -83,6 +115,67 @@ input, select, textarea {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 72px;
+  padding-top: calc(53px + env(safe-area-inset-top, 0px));
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(35, 36, 32, 0.4);
+  z-index: 60;
+}
+.account-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(300px, 82vw);
+  background: var(--surface);
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 18px 18px;
+  box-shadow: 4px 0 20px rgba(35, 36, 32, 0.15);
+}
+.drawer-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.drawer-email {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin: 0 0 22px;
+  word-break: break-all;
+}
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.drawer-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 13px 8px;
+  border-radius: var(--radius);
+  text-align: left;
+}
+.drawer-nav-item:hover { background: var(--bg); }
+.drawer-signout {
+  margin-top: auto;
+  color: var(--danger);
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  border-radius: 0;
 }
 
 .tobudget-card {
