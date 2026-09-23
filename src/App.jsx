@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from './supabaseClient'
-import { useHousehold } from './lib/HouseholdContext'
 import Login from './components/Login'
-import HouseholdSelector from './components/HouseholdSelector'
 import BudgetView from './components/BudgetView'
 import TransactionsView from './components/TransactionsView'
 import AddTransactionForm from './components/AddTransactionForm'
@@ -24,7 +22,9 @@ const TAB_TITLES = {
   about: 'Sobre',
 }
 
-function AppContent() {
+export default function App() {
+  const [session, setSession] = useState(null)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [tab, setTab] = useState('budget')
   const [previousTab, setPreviousTab] = useState('budget')
   const [refreshKey, setRefreshKey] = useState(0)
@@ -32,20 +32,26 @@ function AppContent() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [headerHidden, setHeaderHidden] = useState(false)
 
-  const { selectedHousehold } = useHousehold()
   const contentRef = useRef(null)
   const lastScrollY = useRef(0)
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setCheckingSession(false)
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!session) return
     supabase.auth.getUser().then(({ data }) => {
       setEmail(data?.user?.email ?? '')
     })
-  }, [])
-
-  // Se não tem household selecionado, mostra selector
-  if (!selectedHousehold) {
-    return <HouseholdSelector />
-  }
+  }, [session])
 
   // Header some ao rolar pra baixo, reaparece ao rolar pra cima.
   // Reseta (mostra) sempre que a aba muda, já que cada tela volta ao topo.
@@ -184,25 +190,4 @@ function AppContent() {
       />
     </>
   )
-}
-
-export default function App() {
-  const [session, setSession] = useState(null)
-  const [checkingSession, setCheckingSession] = useState(true)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setCheckingSession(false)
-    })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession)
-    })
-    return () => listener.subscription.unsubscribe()
-  }, [])
-
-  if (checkingSession) return null
-  if (!session) return <Login />
-
-  return <AppContent />
 }

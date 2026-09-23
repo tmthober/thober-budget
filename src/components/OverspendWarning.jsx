@@ -1,19 +1,16 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../supabaseClient'
-import { useHousehold } from '../lib/HouseholdContext'
 import { formatCurrency, addMonths, toMonthKey } from '../lib/budget'
 import { computeCategorySummaries } from '../lib/budget'
 import { parseDateStr } from '../lib/reports'
 import { moveBudgetedAmount } from '../lib/overspend'
 import { fetchOverspendMoves, summarizeOverspendMoves } from '../lib/overspendHistory'
 import CurrencyInput, { amountToCents, centsToAmount } from './CurrencyInput'
-import { getBudgetEntries, getTransactions } from '../lib/supabaseQueries'
 
 const HISTORY_WINDOW_MONTHS = 3
 
 export default function OverspendWarning({ overspendInfo, categories, onResolve }) {
-  const { selectedHousehold } = useHousehold()
   const { category, monthKey, overspentAmount } = overspendInfo
   const [budgetEntries, setBudgetEntries] = useState([])
   const [transactions, setTransactions] = useState([])
@@ -25,13 +22,12 @@ export default function OverspendWarning({ overspendInfo, categories, onResolve 
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!selectedHousehold) return
     async function load() {
       const historyStartKey = toMonthKey(addMonths(parseDateStr(monthKey), -(HISTORY_WINDOW_MONTHS - 1)))
       const [b, t, history] = await Promise.all([
-        getBudgetEntries(selectedHousehold.id),
-        getTransactions(selectedHousehold.id),
-        fetchOverspendMoves(historyStartKey, monthKey, selectedHousehold.id),
+        supabase.from('budget_entries').select('*'),
+        supabase.from('transactions').select('*'),
+        fetchOverspendMoves(historyStartKey, monthKey),
       ])
       setBudgetEntries(b.data ?? [])
       setTransactions(t.data ?? [])
@@ -39,7 +35,7 @@ export default function OverspendWarning({ overspendInfo, categories, onResolve 
       setLoading(false)
     }
     load()
-  }, [monthKey, selectedHousehold])
+  }, [monthKey])
 
   if (loading) return <div className="empty-state">Carregando categorias...</div>
 
@@ -69,7 +65,7 @@ export default function OverspendWarning({ overspendInfo, categories, onResolve 
       return
     }
     setSaving(true)
-    const { error: moveError } = await moveBudgetedAmount(selectedId, category.id, monthKey, amount, selectedHousehold.id)
+    const { error: moveError } = await moveBudgetedAmount(selectedId, category.id, monthKey, amount)
     setSaving(false)
     if (moveError) {
       setError('Não foi possível mover o valor. Tente novamente.')

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../supabaseClient'
-import { useHousehold } from '../lib/HouseholdContext'
 import { IconChevronLeft, IconChevronRight, IconSearch } from './icons'
 import {
   formatCurrency, formatMonthLabel, addMonths, toMonthKey,
@@ -10,13 +9,11 @@ import {
 import { fetchOverspendMoves, summarizeOverspendMoves } from '../lib/overspendHistory'
 import { useToast } from '../lib/ToastContext'
 import OverspendWarning from './OverspendWarning'
-import { getCategoryGroups, getCategories, getBudgetEntries, getTransactions } from '../lib/supabaseQueries'
 
 const HISTORY_WINDOW_MONTHS = 3
 
 export default function BudgetView({ refreshKey }) {
   const showToast = useToast()
-  const { selectedHousehold } = useHousehold()
   const [month, setMonth] = useState(new Date())
   const [groups, setGroups] = useState([])
   const [categories, setCategories] = useState([])
@@ -40,15 +37,13 @@ export default function BudgetView({ refreshKey }) {
   const historyStartKey = toMonthKey(addMonths(month, -(HISTORY_WINDOW_MONTHS - 1)))
 
   async function loadData() {
-    if (!selectedHousehold) return
-    
     setLoading(true)
     setLoadError(false)
     const [g, c, b, t] = await Promise.all([
-      getCategoryGroups(selectedHousehold.id),
-      getCategories(selectedHousehold.id),
-      getBudgetEntries(selectedHousehold.id),
-      getTransactions(selectedHousehold.id),
+      supabase.from('category_groups').select('*').order('sort_order'),
+      supabase.from('categories').select('*').order('sort_order'),
+      supabase.from('budget_entries').select('*'),
+      supabase.from('transactions').select('*'),
     ])
     if (g.error || c.error || b.error || t.error) {
       setLoadError(true)
@@ -60,7 +55,7 @@ export default function BudgetView({ refreshKey }) {
     setBudgetEntries(b.data ?? [])
     setTransactions(t.data ?? [])
 
-    const { moves } = await fetchOverspendMoves(historyStartKey, monthKey, selectedHousehold.id)
+    const { moves } = await fetchOverspendMoves(historyStartKey, monthKey)
     setOverspendStats(summarizeOverspendMoves(moves))
 
     setLoading(false)
@@ -129,7 +124,7 @@ export default function BudgetView({ refreshKey }) {
   async function saveEdit(catId) {
     const amount = parseFloat(editValue.replace(',', '.')) || 0
     const { error } = await supabase.from('budget_entries').upsert(
-      { category_id: catId, month: monthKey, budgeted_amount: amount, household_id: selectedHousehold.id },
+      { category_id: catId, month: monthKey, budgeted_amount: amount },
       { onConflict: 'category_id,month' }
     )
     if (error) {
@@ -185,7 +180,6 @@ export default function BudgetView({ refreshKey }) {
       name,
       sort_order: nextSortOrder,
       is_income: false,
-      household_id: selectedHousehold.id,
     })
     setSavingCategory(false)
     if (error) {

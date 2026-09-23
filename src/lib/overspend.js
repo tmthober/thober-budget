@@ -5,11 +5,11 @@ import { computeCategorySummaries } from './budget'
 // carregar o app inteiro. Usado tanto pelo aviso de estouro quanto pela
 // dica que aparece no formulário de lançamento assim que a categoria é
 // escolhida.
-export async function fetchCategorySummary(categoryId, monthKey, householdId) {
+export async function fetchCategorySummary(categoryId, monthKey) {
   const [catRes, budgetRes, txRes] = await Promise.all([
-    supabase.from('categories').select('*').eq('id', categoryId).eq('household_id', householdId).single(),
-    supabase.from('budget_entries').select('*').eq('category_id', categoryId).eq('household_id', householdId),
-    supabase.from('transactions').select('*').eq('category_id', categoryId).eq('household_id', householdId),
+    supabase.from('categories').select('*').eq('id', categoryId).single(),
+    supabase.from('budget_entries').select('*').eq('category_id', categoryId),
+    supabase.from('transactions').select('*').eq('category_id', categoryId),
   ])
 
   // Se qualquer leitura falhou, não arrisca calcular em cima de dado
@@ -27,8 +27,8 @@ export async function fetchCategorySummary(categoryId, monthKey, householdId) {
 
 // Depois de salvar uma transação, verifica se a categoria dela ficou negativa
 // (disponível < 0) no mês da transação.
-export async function checkOverspend(categoryId, monthKey, householdId) {
-  const summary = await fetchCategorySummary(categoryId, monthKey, householdId)
+export async function checkOverspend(categoryId, monthKey) {
+  const summary = await fetchCategorySummary(categoryId, monthKey)
   if (!summary) return null
   if (summary.available >= -0.005) return null
 
@@ -45,11 +45,10 @@ export async function checkOverspend(categoryId, monthKey, householdId) {
 // Isso é essencial: se a leitura falhasse silenciosamente e o código tratasse
 // isso como "orçado atual = 0", o upsert abaixo SOBRESCREVERIA o valor real
 // da categoria com só a diferença, destruindo o que já estava orçado.
-export async function moveBudgetedAmount(fromCategoryId, toCategoryId, monthKey, amount, householdId) {
+export async function moveBudgetedAmount(fromCategoryId, toCategoryId, monthKey, amount) {
   const { data: existing, error: readError } = await supabase
     .from('budget_entries')
     .select('*')
-    .eq('household_id', householdId)
     .in('category_id', [fromCategoryId, toCategoryId])
     .eq('month', monthKey)
 
@@ -67,8 +66,8 @@ export async function moveBudgetedAmount(fromCategoryId, toCategoryId, monthKey,
 
   const { error: writeError } = await supabase.from('budget_entries').upsert(
     [
-      { category_id: fromCategoryId, month: monthKey, budgeted_amount: newFromAmount, household_id: householdId },
-      { category_id: toCategoryId, month: monthKey, budgeted_amount: newToAmount, household_id: householdId },
+      { category_id: fromCategoryId, month: monthKey, budgeted_amount: newFromAmount },
+      { category_id: toCategoryId, month: monthKey, budgeted_amount: newToAmount },
     ],
     { onConflict: 'category_id,month' }
   )
@@ -85,7 +84,6 @@ export async function moveBudgetedAmount(fromCategoryId, toCategoryId, monthKey,
     from_category_id: fromCategoryId,
     to_category_id: toCategoryId,
     amount,
-    household_id: householdId,
   })
 
   return { error: null }
