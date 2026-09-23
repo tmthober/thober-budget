@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../supabaseClient'
+import { useHousehold } from '../lib/HouseholdContext'
 import { formatCurrency } from '../lib/budget'
 import { transactionsToCsv, downloadCsv } from '../lib/csv'
 import EditTransactionForm from './EditTransactionForm'
@@ -8,9 +9,11 @@ import TransactionFilters, { resolveFilterRange, defaultCustomDate } from './Tra
 import SortMenu from './SortMenu'
 import { IconFilter, IconDownload } from './icons'
 import { useToast } from '../lib/ToastContext'
+import { getTransactions, getCategories, getCategoryGroups, deleteTransaction } from '../lib/supabaseQueries'
 
 export default function TransactionsView({ refreshKey }) {
   const showToast = useToast()
+  const { selectedHousehold } = useHousehold()
   const [transactions, setTransactions] = useState([])
   const [categories, setCategories] = useState([])
   const [groups, setGroups] = useState([])
@@ -27,12 +30,13 @@ export default function TransactionsView({ refreshKey }) {
   const [sortOption, setSortOption] = useState('date_desc')
 
   async function load() {
+    if (!selectedHousehold) return
     setLoading(true)
     setLoadError(false)
     const [t, c, g] = await Promise.all([
-      supabase.from('transactions').select('*'),
-      supabase.from('categories').select('*'),
-      supabase.from('category_groups').select('*'),
+      getTransactions(selectedHousehold.id),
+      getCategories(selectedHousehold.id),
+      getCategoryGroups(selectedHousehold.id),
     ])
     if (t.error || c.error || g.error) {
       setLoadError(true)
@@ -45,7 +49,7 @@ export default function TransactionsView({ refreshKey }) {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [refreshKey, localRefresh])
+  useEffect(() => { load() }, [refreshKey, localRefresh, selectedHousehold])
 
   if (editingTx) {
     return (
@@ -107,33 +111,11 @@ export default function TransactionsView({ refreshKey }) {
 
   const sorted = [...filtered].sort((a, b) => {
     switch (sortOption) {
-      case 'date_asc': {
-        // 1º Nível: Compara a data da transação (crescente)
-        const dateDiff = a.date.localeCompare(b.date)
-        if (dateDiff !== 0) return dateDiff
-
-        // 2º Nível (Desempate dentro do mesmo dia): Ordem de cadastro (mais antigo primeiro)
-        if (a.created_at && b.created_at) {
-          return a.created_at.localeCompare(b.created_at)
-        }
-        return a.id > b.id ? 1 : -1
-      }
-
+      case 'date_asc': return a.date.localeCompare(b.date)
       case 'amount_desc': return Number(b.amount) - Number(a.amount)
       case 'amount_asc': return Number(a.amount) - Number(b.amount)
-
       case 'date_desc':
-      default: {
-        // 1º Nível: Compara a data da transação (decrescente)
-        const dateDiff = b.date.localeCompare(a.date)
-        if (dateDiff !== 0) return dateDiff
-
-        // 2º Nível (Desempate dentro do mesmo dia): Ordem de cadastro (mais recente primeiro)
-        if (a.created_at && b.created_at) {
-          return b.created_at.localeCompare(a.created_at)
-        }
-        return b.id > a.id ? 1 : -1
-      }
+      default: return b.date.localeCompare(a.date)
     }
   })
 

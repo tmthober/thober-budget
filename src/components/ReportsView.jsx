@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useHousehold } from '../lib/HouseholdContext'
 import { formatCurrency, monthKeyFromDateString } from '../lib/budget'
 import { presetRange, previousPeriod, aggregateSpending, formatDateStr } from '../lib/reports'
 import { summarizeOverspendMoves } from '../lib/overspendHistory'
 import PieChart, { PALETTE } from './PieChart'
 import { IconChevronLeft } from './icons'
+import { getCategories, getCategoryGroups, getTransactions, getOverspendMoves } from '../lib/supabaseQueries'
 
 const PRESETS = [
   { id: 'month', label: 'Este mês' },
@@ -16,6 +18,7 @@ const PRESETS = [
 ]
 
 export default function ReportsView() {
+  const { selectedHousehold } = useHousehold()
   const [preset, setPreset] = useState('month')
   const [customStart, setCustomStart] = useState(() => formatDateStr(new Date()))
   const [customEnd, setCustomEnd] = useState(() => formatDateStr(new Date()))
@@ -28,13 +31,14 @@ export default function ReportsView() {
   const [selectedGroupId, setSelectedGroupId] = useState(null)
 
   async function load() {
+    if (!selectedHousehold) return
     setLoading(true)
     setLoadError(false)
     const [c, g, t, m] = await Promise.all([
-      supabase.from('categories').select('*'),
-      supabase.from('category_groups').select('*'),
-      supabase.from('transactions').select('*'),
-      supabase.from('overspend_moves').select('*'),
+      getCategories(selectedHousehold.id),
+      getCategoryGroups(selectedHousehold.id),
+      getTransactions(selectedHousehold.id),
+      getOverspendMoves(selectedHousehold.id),
     ])
     if (c.error || g.error || t.error || m.error) {
       setLoadError(true)
@@ -48,7 +52,7 @@ export default function ReportsView() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [selectedHousehold])
 
   // Volta pra visão geral sempre que o filtro de período muda, pra não ficar
   // "preso" num grupo que não existe mais nesse novo período.
