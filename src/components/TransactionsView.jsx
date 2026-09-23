@@ -24,7 +24,7 @@ export default function TransactionsView({ refreshKey }) {
   const [customStart, setCustomStart] = useState(defaultCustomDate)
   const [customEnd, setCustomEnd] = useState(defaultCustomDate)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState(new Set())
-  const [sortOption, setSortOption] = useState('entry_desc')
+  const [sortOption, setSortOption] = useState('date_desc')
 
   async function load() {
     setLoading(true)
@@ -107,21 +107,33 @@ export default function TransactionsView({ refreshKey }) {
 
   const sorted = [...filtered].sort((a, b) => {
     switch (sortOption) {
-case 'entry_desc':
-        // Tenta usar a data de criação padrão do Supabase. 
-        // Se não existir, faz o fallback para o ID (assumindo que seja numérico e sequencial).
-        if (a.created_at && b.created_at) {
-          return b.created_at.localeCompare(a.created_at)
-        }
-        return b.id > a.id ? 1 : -1
-      case 'amount_desc': return Number(b.amount) - Number(a.amount)
-      case 'amount_asc': return Number(a.amount) - Number(b.amount)
-      case 'entry_asc':
-        // Cadastro mais antigo (crescente)
+      case 'date_asc': {
+        // 1º Nível: Compara a data da transação (crescente)
+        const dateDiff = a.date.localeCompare(b.date)
+        if (dateDiff !== 0) return dateDiff
+
+        // 2º Nível (Desempate dentro do mesmo dia): Ordem de cadastro (mais antigo primeiro)
         if (a.created_at && b.created_at) {
           return a.created_at.localeCompare(b.created_at)
         }
         return a.id > b.id ? 1 : -1
+      }
+
+      case 'amount_desc': return Number(b.amount) - Number(a.amount)
+      case 'amount_asc': return Number(a.amount) - Number(b.amount)
+
+      case 'date_desc':
+      default: {
+        // 1º Nível: Compara a data da transação (decrescente)
+        const dateDiff = b.date.localeCompare(a.date)
+        if (dateDiff !== 0) return dateDiff
+
+        // 2º Nível (Desempate dentro do mesmo dia): Ordem de cadastro (mais recente primeiro)
+        if (a.created_at && b.created_at) {
+          return b.created_at.localeCompare(a.created_at)
+        }
+        return b.id > a.id ? 1 : -1
+      }
     }
   })
 

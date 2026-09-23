@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { IconArrowsUpDown } from './icons'
 
 const OPTIONS = [
-  { id: 'entry_desc', label: 'Mais recentes primeiro' },
-  { id: 'entry_asc', label: 'Mais antigas primeiro' },
+  { id: 'date_desc', label: 'Mais recentes primeiro' },
+  { id: 'date_asc', label: 'Mais antigas primeiro' },
   { id: 'amount_desc', label: 'Maior valor primeiro' },
   { id: 'amount_asc', label: 'Menor valor primeiro' },
 ]
