@@ -25,9 +25,9 @@ export default function AccountDrawer({ open, onClose, email, onNavigate }) {
           />
           <motion.aside
             className="account-drawer"
-            initial={{ x: '-100%' }}
+            initial={{ x: '100%' }}
             animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
+            exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 340, damping: 34 }}
             role="dialog"
             aria-label="Menu da conta"

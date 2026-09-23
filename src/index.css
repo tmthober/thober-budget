@@ -50,33 +50,40 @@ input, select, textarea {
   font-size: 16px;
 }
 
-.app-header {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
+.app-header-safe-area {
+  flex-shrink: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: var(--surface);
+  position: relative;
   z-index: 40;
+}
+
+.app-header {
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 14px 18px;
-  padding-top: calc(14px + env(safe-area-inset-top, 0px));
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
 }
 
 .app-header h1 {
   font-size: 17px;
   font-weight: 600;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .drawer-avatar {
   width: 34px;
   height: 34px;
   min-width: 34px;
+  flex-shrink: 0;
   border-radius: 50%;
   border: none;
   background: var(--accent-soft);
@@ -115,7 +122,6 @@ input, select, textarea {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 72px;
-  padding-top: calc(53px + env(safe-area-inset-top, 0px));
 }
 
 .drawer-backdrop {
@@ -128,14 +134,14 @@ input, select, textarea {
   position: fixed;
   top: 0;
   bottom: 0;
-  left: 0;
+  right: 0;
   width: min(300px, 82vw);
   background: var(--surface);
   z-index: 61;
   display: flex;
   flex-direction: column;
   padding: calc(18px + env(safe-area-inset-top, 0px)) 18px 18px;
-  box-shadow: 4px 0 20px rgba(35, 36, 32, 0.15);
+  box-shadow: -4px 0 20px rgba(35, 36, 32, 0.15);
 }
 .drawer-top {
   display: flex;
