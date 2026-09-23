@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../supabaseClient'
+import { useHousehold } from '../lib/HouseholdContext'
 import CategoryPicker from './CategoryPicker'
 import CategoryStatus from './CategoryStatus'
 import CurrencyInput, { amountToCents, centsToAmount } from './CurrencyInput'
@@ -9,9 +10,11 @@ import { IconChevronLeft } from './icons'
 import { monthKeyFromDateString } from '../lib/budget'
 import { checkOverspend } from '../lib/overspend'
 import { useToast } from '../lib/ToastContext'
+import { getCategoryGroups, getCategories, updateTransaction, deleteTransaction as deleteTransactionQuery } from '../lib/supabaseQueries'
 
 export default function EditTransactionForm({ transaction, onBack, onSaved, onDeleted }) {
   const showToast = useToast()
+  const { selectedHousehold } = useHousehold()
   const [groups, setGroups] = useState([])
   const [categories, setCategories] = useState([])
   const [categoryId, setCategoryId] = useState(transaction.category_id)
@@ -25,16 +28,17 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
   const [overspendInfo, setOverspendInfo] = useState(null)
 
   useEffect(() => {
+    if (!selectedHousehold) return
     async function load() {
       const [g, c] = await Promise.all([
-        supabase.from('category_groups').select('*').order('sort_order'),
-        supabase.from('categories').select('*').order('sort_order'),
+        getCategoryGroups(selectedHousehold.id),
+        getCategories(selectedHousehold.id),
       ])
       setGroups(g.data ?? [])
       setCategories(c.data ?? [])
     }
     load()
-  }, [])
+  }, [selectedHousehold])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -48,15 +52,12 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
       return
     }
     setSaving(true)
-    const { error: updateError } = await supabase
-      .from('transactions')
-      .update({
-        category_id: categoryId,
-        amount: centsToAmount(amountCents),
-        date,
-        note: note || null,
-      })
-      .eq('id', transaction.id)
+    const { error: updateError } = await updateTransaction(selectedHousehold.id, transaction.id, {
+      category_id: categoryId,
+      amount: centsToAmount(amountCents),
+      date,
+      note: note || null,
+    })
     setSaving(false)
     if (updateError) {
       setError('Não foi possível salvar. Tente novamente.')
@@ -66,7 +67,7 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
     const monthKey = monthKeyFromDateString(date)
     let overspend = null
     try {
-      overspend = await checkOverspend(categoryId, monthKey)
+      overspend = await checkOverspend(categoryId, monthKey, selectedHousehold.id)
     } catch {
       overspend = null
     }
@@ -80,10 +81,7 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
 
   async function handleDelete() {
     setDeleting(true)
-    const { error: deleteError } = await supabase
-      .from('transactions')
-      .delete()
-      .eq('id', transaction.id)
+    const { error: deleteError } = await deleteTransactionQuery(selectedHousehold.id, transaction.id)
     setDeleting(false)
     if (deleteError) {
       setError('Não foi possível excluir. Tente novamente.')

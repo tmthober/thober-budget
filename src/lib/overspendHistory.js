@@ -3,10 +3,11 @@ import { supabase } from '../supabaseClient'
 // Busca todos os movimentos de "cobrir estouro" com month dentro de
 // [startMonthKey, endMonthKey] (comparação por string, mesmo padrão do
 // resto do app — sem parsear como Date).
-export async function fetchOverspendMoves(startMonthKey, endMonthKey) {
+export async function fetchOverspendMoves(startMonthKey, endMonthKey, householdId) {
   const { data, error } = await supabase
     .from('overspend_moves')
     .select('*')
+    .eq('household_id', householdId)
     .gte('month', startMonthKey)
     .lte('month', endMonthKey)
 

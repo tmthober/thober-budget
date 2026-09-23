@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../supabaseClient'
+import { useHousehold } from '../lib/HouseholdContext'
 import CategoryPicker from './CategoryPicker'
 import CategoryStatus from './CategoryStatus'
 import CurrencyInput, { centsToAmount } from './CurrencyInput'
@@ -8,9 +9,11 @@ import OverspendWarning from './OverspendWarning'
 import { monthKeyFromDateString } from '../lib/budget'
 import { checkOverspend } from '../lib/overspend'
 import { useToast } from '../lib/ToastContext'
+import { getCategoryGroups, getCategories, insertTransaction } from '../lib/supabaseQueries'
 
 export default function AddTransactionForm({ onSaved, onCancel }) {
   const showToast = useToast()
+  const { selectedHousehold } = useHousehold()
   const [groups, setGroups] = useState([])
   const [categories, setCategories] = useState([])
   const [categoryId, setCategoryId] = useState('')
@@ -22,16 +25,17 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
   const [overspendInfo, setOverspendInfo] = useState(null)
 
   useEffect(() => {
+    if (!selectedHousehold) return
     async function load() {
       const [g, c] = await Promise.all([
-        supabase.from('category_groups').select('*').order('sort_order'),
-        supabase.from('categories').select('*').order('sort_order'),
+        getCategoryGroups(selectedHousehold.id),
+        getCategories(selectedHousehold.id),
       ])
       setGroups(g.data ?? [])
       setCategories(c.data ?? [])
     }
     load()
-  }, [])
+  }, [selectedHousehold])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -45,7 +49,7 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
       return
     }
     setSaving(true)
-    const { error: insertError } = await supabase.from('transactions').insert({
+    const { error: insertError } = await insertTransaction(selectedHousehold.id, {
       category_id: categoryId,
       amount: centsToAmount(amountCents),
       date,
@@ -64,7 +68,7 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
 
     let overspend = null
     try {
-      overspend = await checkOverspend(savedCategoryId, monthKey)
+      overspend = await checkOverspend(savedCategoryId, monthKey, selectedHousehold.id)
     } catch {
       overspend = null
     }
