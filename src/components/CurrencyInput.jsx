@@ -7,6 +7,7 @@ function centsToDisplay(cents) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
+}
 
 export default function CurrencyInput({ id, cents, onChange, placeholder = 'R$ 0,00' }) {
   function handleChange(e) {
@@ -32,5 +33,6 @@ export function centsToAmount(cents) {
 }
 
 export function amountToCents(amount) {
-  return Math.round((amount ?? 0) * 100)
+  return Math.round((amount ?? 0) * 1
+                    00)
 }
