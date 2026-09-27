@@ -20,6 +20,7 @@ export default function BudgetView({ refreshKey }) {
   const [budgetEntries, setBudgetEntries] = useState([])
   const [transactions, setTransactions] = useState([])
   const [overspendStats, setOverspendStats] = useState({})
+  const [overspendMoves, setOverspendMoves] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -58,6 +59,13 @@ export default function BudgetView({ refreshKey }) {
     const { moves } = await fetchOverspendMoves(historyStartKey, monthKey)
     setOverspendStats(summarizeOverspendMoves(moves))
 
+    // Moves do mês visualizado — para exibir lent/borrowed por categoria
+    const { data: movesThisMonth } = await supabase
+      .from('overspend_moves')
+      .select('*')
+      .eq('month', monthKey)
+    setOverspendMoves(movesThisMonth ?? [])
+
     setLoading(false)
   }
 
@@ -78,7 +86,7 @@ export default function BudgetView({ refreshKey }) {
 
   const incomeGroup = groups.find((g) => g.name === 'Income')
   const expenseGroups = groups.filter((g) => g.name !== 'Income')
-  const summaries = computeCategorySummaries(categories, budgetEntries, transactions, monthKey)
+  const summaries = computeCategorySummaries(categories, budgetEntries, transactions, monthKey, overspendMoves)
   const toBeBudgeted = computeToBeBudgeted(categories, budgetEntries, transactions, monthKey)
 
   if (overspendTarget) {
@@ -344,7 +352,9 @@ export default function BudgetView({ refreshKey }) {
                         ) : (
                           <p className="sub" onClick={() => startEdit(cat)}>
                             Orçado {formatCurrency(cat.budgetedThisMonth)}
-                            {cat.activityThisMonth !== 0 && ` · Gasto ${formatCurrency(cat.activityThisMonth)}`}
+                            {cat.lent > 0 && ` · emprestou ${formatCurrency(cat.lent)}`}
+                            {cat.activityThisMonth > 0 && ` · gasto ${formatCurrency(cat.activityThisMonth)}`}
+                            {cat.borrowed > 0 && ` · estourou ${formatCurrency(cat.borrowed)}`}
                           </p>
                         )}
                       </div>
@@ -356,6 +366,7 @@ export default function BudgetView({ refreshKey }) {
                     </div>
                     {cat.budgetedThisMonth > 0 && (
                       <div className="progress-track thin">
+                        {/* Segmento principal: gasto */}
                         <div
                           className="progress-fill"
                           style={{
@@ -363,6 +374,26 @@ export default function BudgetView({ refreshKey }) {
                             background: catOverBudget ? 'var(--danger)' : 'var(--accent)',
                           }}
                         />
+                        {/* Segmento hachurado: emprestou (cinza riscado) */}
+                        {cat.lent > 0 && (() => {
+                          const lentPct = Math.min(
+                            (cat.lent / cat.budgetedThisMonth) * 100,
+                            Math.max(0, 100 - catPct)
+                          )
+                          return lentPct > 0 ? (
+                            <div className="progress-fill progress-lent" style={{ width: `${lentPct}%` }} />
+                          ) : null
+                        })()}
+                        {/* Segmento amarelo: recebeu empréstimo (borrowed) */}
+                        {cat.borrowed > 0 && (() => {
+                          const borrowedPct = Math.min(
+                            (cat.borrowed / cat.budgetedThisMonth) * 100,
+                            Math.max(0, 100 - catPct)
+                          )
+                          return borrowedPct > 0 ? (
+                            <div className="progress-fill progress-borrowed" style={{ width: `${borrowedPct}%` }} />
+                          ) : null
+                        })()}
                       </div>
                     )}
                     {isNegative && (
