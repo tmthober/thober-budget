@@ -33,6 +33,5 @@ export function centsToAmount(cents) {
 }
 
 export function amountToCents(amount) {
-  return Math.round((amount ?? 0) * 1
-                    00)
+  return Math.round((amount ?? 0) * 100)
 }
