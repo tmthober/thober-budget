@@ -44,8 +44,12 @@ function yearMonth(dateStr) {
 // Calcula, para cada categoria, o valor orçado neste mês, o gasto neste mês,
 // e o "disponível" acumulado (orçado acumulado - gasto acumulado até este mês).
 // budgetEntries e transactions são todas as linhas já carregadas do Supabase.
-export function computeCategorySummaries(categories, budgetEntries, transactions, monthKey) {
+// overspendMoves (opcional): registros de overspend_moves do mês visualizado,
+// usados para calcular lent (quanto a categoria emprestou) e borrowed (quanto recebeu).
+export function computeCategorySummaries(categories, budgetEntries, transactions, monthKey, overspendMoves = []) {
   const targetYm = yearMonth(monthKey)
+  // Filtra só os moves do mês atual (campo month é 'YYYY-MM-01')
+  const movesThisMonth = overspendMoves.filter((m) => yearMonth(m.month) === targetYm)
 
   return categories.map((cat) => {
     const entriesUpToMonth = budgetEntries.filter(
@@ -65,11 +69,23 @@ export function computeCategorySummaries(categories, budgetEntries, transactions
     const txThisMonth = txUpToMonth.filter((t) => yearMonth(t.date) === targetYm)
     const activityThisMonth = txThisMonth.reduce((sum, t) => sum + Number(t.amount), 0)
 
+    // Quanto esta categoria emprestou para outras (saiu via from_category_id)
+    const lent = movesThisMonth
+      .filter((m) => m.from_category_id === cat.id)
+      .reduce((sum, m) => sum + Number(m.amount), 0)
+
+    // Quanto esta categoria recebeu de outras (entrou via to_category_id)
+    const borrowed = movesThisMonth
+      .filter((m) => m.to_category_id === cat.id)
+      .reduce((sum, m) => sum + Number(m.amount), 0)
+
     return {
       ...cat,
       budgetedThisMonth: budgetedThisMonthAmount,
       activityThisMonth,
       available: cumulativeBudgeted - cumulativeActivity,
+      lent,
+      borrowed,
     }
   })
 }
