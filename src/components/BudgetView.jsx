@@ -364,38 +364,39 @@ export default function BudgetView({ refreshKey }) {
                         {formatCurrency(cat.available)}
                       </span>
                     </div>
-                    {cat.budgetedThisMonth > 0 && (
-                      <div className="progress-track thin">
-                        {/* Segmento principal: gasto */}
-                        <div
-                          className="progress-fill"
-                          style={{
-                            width: `${catPct}%`,
-                            background: catOverBudget ? 'var(--danger)' : 'var(--accent)',
-                          }}
-                        />
-                        {/* Segmento hachurado: emprestou (cinza riscado) */}
-                        {cat.lent > 0 && (() => {
-                          const lentPct = Math.min(
-                            (cat.lent / cat.budgetedThisMonth) * 100,
-                            Math.max(0, 100 - catPct)
-                          )
-                          return lentPct > 0 ? (
-                            <div className="progress-fill progress-lent" style={{ width: `${lentPct}%` }} />
-                          ) : null
-                        })()}
-                        {/* Segmento amarelo: recebeu empréstimo (borrowed) */}
-                        {cat.borrowed > 0 && (() => {
-                          const borrowedPct = Math.min(
-                            (cat.borrowed / cat.budgetedThisMonth) * 100,
-                            Math.max(0, 100 - catPct)
-                          )
-                          return borrowedPct > 0 ? (
-                            <div className="progress-fill progress-borrowed" style={{ width: `${borrowedPct}%` }} />
-                          ) : null
-                        })()}
-                      </div>
-                    )}
+                    {cat.budgetedThisMonth > 0 && (() => {
+                      const B = cat.budgetedThisMonth
+                      const overspent      = Math.max(0, cat.activityThisMonth - B)
+                      const covered        = Math.min(cat.borrowed, overspent)
+                      const greenPctRaw    = (Math.min(cat.activityThisMonth, B) / B) * 100
+                      const yellowPctRaw   = (covered / B) * 100
+                      const lentPctRaw     = (cat.lent / B) * 100
+                      // Verde: gasto dentro do orçado, excluindo a parte coberta (que vira amarelo)
+                      const greenPct  = Math.max(0, greenPctRaw - yellowPctRaw)
+                      // Amarelo e hachurado dividem o restante; se não couberem os dois,
+                      // comprimem proporcionalmente (ambos são igualmente "reais")
+                      const afterGreen = 100 - greenPct
+                      const bothRaw    = yellowPctRaw + lentPctRaw
+                      const scale      = bothRaw > afterGreen && bothRaw > 0 ? afterGreen / bothRaw : 1
+                      const yellowPct  = yellowPctRaw * scale
+                      const lentPct    = lentPctRaw   * scale
+                      return (
+                        <div className="progress-track thin">
+                          {greenPct > 0 && (
+                            <div className="progress-fill" style={{ width: `${greenPct}%`, background: 'var(--accent)' }} />
+                          )}
+                          {yellowPct > 0 && (
+                            <div className="progress-fill progress-borrowed" style={{ width: `${yellowPct}%` }} />
+                          )}
+                          {lentPct > 0 && (
+                            <div
+                              className={`progress-fill ${covered > 0 ? 'progress-lent-yellow' : 'progress-lent'}`}
+                              style={{ width: `${lentPct}%` }}
+                            />
+                          )}
+                        </div>
+                      )
+                    })()}
                     {isNegative && (
                       <button
                         type="button"
