@@ -273,7 +273,7 @@ input, select, textarea {
   position: relative;
   display: flex;
 }
-.progress-track.thin { height: 6px; }
+.progress-track.thin { height: 6px; margin-bottom: 4px; }
 .progress-fill {
   height: 100%;
   border-radius: 0;
