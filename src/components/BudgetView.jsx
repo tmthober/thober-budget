@@ -366,20 +366,18 @@ export default function BudgetView({ refreshKey }) {
                     </div>
                     {cat.budgetedThisMonth > 0 && (() => {
                       const B = cat.budgetedThisMonth
-                      const overspent      = Math.max(0, cat.activityThisMonth - B)
-                      const covered        = Math.min(cat.borrowed, overspent)
-                      const greenPctRaw    = (Math.min(cat.activityThisMonth, B) / B) * 100
-                      const yellowPctRaw   = (covered / B) * 100
-                      const lentPctRaw     = (cat.lent / B) * 100
-                      // Verde: gasto dentro do orçado, excluindo a parte coberta (que vira amarelo)
-                      const greenPct  = Math.max(0, greenPctRaw - yellowPctRaw)
-                      // Amarelo e hachurado dividem o restante; se não couberem os dois,
-                      // comprimem proporcionalmente (ambos são igualmente "reais")
+                      // Usar borrowed diretamente — o overspent calculado por activityThisMonth - B
+                      // não funciona quando o estouro vem de rollover acumulado de meses anteriores
+                      const greenPctRaw  = (Math.min(cat.activityThisMonth, B) / B) * 100
+                      const yellowPctRaw = (cat.borrowed / B) * 100
+                      const lentPctRaw   = (cat.lent / B) * 100
+
+                      const greenPct   = Math.max(0, greenPctRaw - yellowPctRaw)
                       const afterGreen = 100 - greenPct
                       const bothRaw    = yellowPctRaw + lentPctRaw
                       const scale      = bothRaw > afterGreen && bothRaw > 0 ? afterGreen / bothRaw : 1
                       const yellowPct  = yellowPctRaw * scale
-                      const lentPct    = lentPctRaw   * scale
+                      const lentPct    = lentPctRaw * scale
                       return (
                         <div className="progress-track thin">
                           {greenPct > 0 && (
@@ -390,7 +388,7 @@ export default function BudgetView({ refreshKey }) {
                           )}
                           {lentPct > 0 && (
                             <div
-                              className={`progress-fill ${covered > 0 ? 'progress-lent-yellow' : 'progress-lent'}`}
+                              className={`progress-fill ${cat.borrowed > 0 ? 'progress-lent-yellow' : 'progress-lent'}`}
                               style={{ width: `${lentPct}%` }}
                             />
                           )}
