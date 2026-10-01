@@ -9,6 +9,7 @@ import {
 import { fetchOverspendMoves, summarizeOverspendMoves } from '../lib/overspendHistory'
 import { useToast } from '../lib/ToastContext'
 import OverspendWarning from './OverspendWarning'
+import { loadCopyPreview, applyCopyBudget } from '../lib/copyBudget'
 
 const HISTORY_WINDOW_MONTHS = 3
 
@@ -32,6 +33,7 @@ export default function BudgetView({ refreshKey }) {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [addCategoryError, setAddCategoryError] = useState(null)
   const [savingCategory, setSavingCategory] = useState(false)
+  const [copyPanel, setCopyPanel] = useState(null)
 
   const monthKey = toMonthKey(month)
   const historyStartKey = toMonthKey(addMonths(month, -(HISTORY_WINDOW_MONTHS - 1)))
@@ -61,7 +63,7 @@ export default function BudgetView({ refreshKey }) {
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [refreshKey, monthKey])
+  useEffect(() => { loadData(); setCopyPanel(null) }, [refreshKey, monthKey])
 
   if (loading) return <div className="empty-state">Carregando orçamento...</div>
 
@@ -145,6 +147,29 @@ export default function BudgetView({ refreshKey }) {
       monthKey,
       overspentAmount: Math.abs(cat.available),
     })
+  }
+
+  async function openCopyPanel() {
+    setCopyPanel({ status: 'loading' })
+    const result = await loadCopyPreview(monthKey, categories)
+    if (result.error) {
+      setCopyPanel({ status: 'error' })
+      return
+    }
+    setCopyPanel({ status: 'ready', preview: result })
+  }
+
+  async function confirmCopy() {
+    const panel = copyPanel
+    setCopyPanel({ ...panel, status: 'saving' })
+    const { error } = await applyCopyBudget(panel.preview.rows)
+    if (error) {
+      setCopyPanel({ ...panel, status: 'error' })
+      return
+    }
+    setCopyPanel(null)
+    showToast('Orçado copiado do mês anterior')
+    loadData()
   }
 
   function startAddCategory() {
@@ -258,6 +283,71 @@ export default function BudgetView({ refreshKey }) {
         <button className="icon-btn" onClick={() => setMonth(addMonths(month, 1))} aria-label="Próximo mês">
           <IconChevronRight />
         </button>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        {!copyPanel ? (
+          <button type="button" className="secondary-btn" onClick={openCopyPanel}>
+            Copiar orçado de {formatMonthLabel(addMonths(month, -1))}
+          </button>
+        ) : (
+          <div className="category-row">
+            {copyPanel.status === 'loading' && <p className="sub">Calculando valores originais...</p>}
+            {copyPanel.status === 'error' && (
+              <>
+                <p className="edit-error-text">
+                  Não foi possível copiar. Nada foi alterado ou parte falhou — verifique a internet e tente de novo (só categorias zeradas são tocadas).
+                </p>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button type="button" className="secondary-btn" onClick={openCopyPanel}>Tentar novamente</button>
+                  <button type="button" className="secondary-btn" onClick={() => setCopyPanel(null)}>Fechar</button>
+                </div>
+              </>
+            )}
+            {(copyPanel.status === 'ready' || copyPanel.status === 'saving') && (() => {
+              const p = copyPanel.preview
+              const saving = copyPanel.status === 'saving'
+              if (p.rows.length === 0) {
+                return (
+                  <>
+                    <p className="sub">
+                      {p.prevEmpty
+                        ? 'O mês anterior não tem orçamento para copiar.'
+                        : 'Nada para copiar: as categorias do mês anterior já têm orçado neste mês.'}
+                    </p>
+                    <button type="button" className="secondary-btn" style={{ marginTop: 8 }} onClick={() => setCopyPanel(null)}>
+                      Fechar
+                    </button>
+                  </>
+                )
+              }
+              return (
+                <>
+                  <p className="name">Copiar orçado original</p>
+                  <p className="sub">
+                    {p.rows.length} {p.rows.length === 1 ? 'categoria sem orçado' : 'categorias sem orçado'} neste mês
+                    receberão o valor planejado de {formatMonthLabel(addMonths(month, -1))}, antes de estouros e empréstimos.
+                    Total: {formatCurrency(p.total)}.
+                  </p>
+                  {p.adjusted > 0 && (
+                    <p className="sub">{p.adjusted} delas tiveram o valor ajustado por cobertura — o ajuste não é copiado.</p>
+                  )}
+                  {p.keptExisting > 0 && (
+                    <p className="sub">{p.keptExisting} que já têm orçado neste mês ficam como estão.</p>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button type="button" className="secondary-btn" onClick={confirmCopy} disabled={saving}>
+                      {saving ? 'Copiando...' : 'Copiar'}
+                    </button>
+                    <button type="button" className="secondary-btn" onClick={() => setCopyPanel(null)} disabled={saving}>
+                      Cancelar
+                    </button>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        )}
       </div>
 
       <div className="tobudget-card">
