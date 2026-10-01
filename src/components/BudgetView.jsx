@@ -12,7 +12,7 @@ import OverspendWarning from './OverspendWarning'
 
 const HISTORY_WINDOW_MONTHS = 3
 
-export default function BudgetView({ refreshKey }) {
+export default function BudgetView({ refreshKey, onCategorySelect, onMonthChange }) {
   const showToast = useToast()
   const [month, setMonth] = useState(new Date())
   const [groups, setGroups] = useState([])
@@ -23,9 +23,7 @@ export default function BudgetView({ refreshKey }) {
   const [overspendMoves, setOverspendMoves] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [editValue, setEditValue] = useState('')
-  const [editError, setEditError] = useState(null)
+  // edição de orçamento foi movida para CategoryDetailView
   const [search, setSearch] = useState('')
   const [overspendTarget, setOverspendTarget] = useState(null)
   const [addingCategory, setAddingCategory] = useState(false)
@@ -36,6 +34,8 @@ export default function BudgetView({ refreshKey }) {
 
   const monthKey = toMonthKey(month)
   const historyStartKey = toMonthKey(addMonths(month, -(HISTORY_WINDOW_MONTHS - 1)))
+
+  useEffect(() => { onMonthChange?.(month) }, [month])
 
   async function loadData() {
     setLoading(true)
@@ -122,30 +122,6 @@ export default function BudgetView({ refreshKey }) {
   const visibleSummaries = query
     ? expenseSummaries.filter((c) => c.name.toLowerCase().includes(query))
     : expenseSummaries
-
-  function startEdit(cat) {
-    setEditingId(cat.id)
-    setEditValue(String(cat.budgetedThisMonth || ''))
-    setEditError(null)
-  }
-
-  async function saveEdit(catId) {
-    const amount = parseFloat(editValue.replace(',', '.')) || 0
-    const { error } = await supabase.from('budget_entries').upsert(
-      { category_id: catId, month: monthKey, budgeted_amount: amount },
-      { onConflict: 'category_id,month' }
-    )
-    if (error) {
-      // Mantém o campo aberto com o valor digitado — nada se perde, e a
-      // pessoa vê exatamente por que não salvou.
-      setEditError('Não foi possível salvar. Verifique sua internet e tente de novo.')
-      return
-    }
-    setEditingId(null)
-    setEditError(null)
-    showToast('Orçamento atualizado')
-    loadData()
-  }
 
   function openCoverOverspend(cat) {
     setOverspendTarget({
@@ -330,33 +306,23 @@ export default function BudgetView({ refreshKey }) {
                 const lentCount = hist?.lentMonths.size ?? 0
                 const isNegative = cat.available < 0
                 return (
-                  <div className="category-row" key={cat.id}>
+                  <div
+                    className="category-row category-row-clickable"
+                    key={cat.id}
+                    onClick={() => onCategorySelect?.(cat)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && onCategorySelect?.(cat)}
+                  >
                     <div className="category-row-top">
                       <div>
                         <p className="name">{cat.name}</p>
-                        {editingId === cat.id ? (
-                          <>
-                            <input
-                              autoFocus
-                              inputMode="decimal"
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onBlur={() => saveEdit(cat.id)}
-                              onKeyDown={(e) => e.key === 'Enter' && saveEdit(cat.id)}
-                              style={{ width: 90, fontSize: 12, padding: '2px 6px', marginTop: 2 }}
-                            />
-                            {editError && (
-                              <p className="edit-error-text">{editError}</p>
-                            )}
-                          </>
-                        ) : (
-                          <p className="sub" onClick={() => startEdit(cat)}>
-                            Orçado {formatCurrency(cat.budgetedThisMonth)}
-                            {cat.lent > 0 && ` · emprestou ${formatCurrency(cat.lent)}`}
-                            {cat.activityThisMonth > 0 && ` · gasto ${formatCurrency(cat.activityThisMonth)}`}
-                            {cat.borrowed > 0 && ` · estourou ${formatCurrency(cat.borrowed)}`}
-                          </p>
-                        )}
+                        <p className="sub">
+                          Orçado {formatCurrency(cat.budgetedThisMonth)}
+                          {cat.lent > 0 && ` · emprestou ${formatCurrency(cat.lent)}`}
+                          {cat.activityThisMonth > 0 && ` · gasto ${formatCurrency(cat.activityThisMonth)}`}
+                          {cat.borrowed > 0 && ` · estourou ${formatCurrency(cat.borrowed)}`}
+                        </p>
                       </div>
                       <span className="available" style={{
                         color: isNegative ? 'var(--danger)' : cat.available === 0 ? 'var(--ink-soft)' : 'var(--accent)',
@@ -399,7 +365,7 @@ export default function BudgetView({ refreshKey }) {
                       <button
                         type="button"
                         className="cover-overspend-btn"
-                        onClick={() => openCoverOverspend(cat)}
+                        onClick={(e) => { e.stopPropagation(); openCoverOverspend(cat) }}
                       >
                         Cobrir estouro →
                       </button>
