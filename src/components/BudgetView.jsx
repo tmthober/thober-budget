@@ -20,7 +20,6 @@ export default function BudgetView({ refreshKey }) {
   const [budgetEntries, setBudgetEntries] = useState([])
   const [transactions, setTransactions] = useState([])
   const [overspendStats, setOverspendStats] = useState({})
-  const [overspendMoves, setOverspendMoves] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -59,13 +58,6 @@ export default function BudgetView({ refreshKey }) {
     const { moves } = await fetchOverspendMoves(historyStartKey, monthKey)
     setOverspendStats(summarizeOverspendMoves(moves))
 
-    // Moves do mês visualizado — para exibir lent/borrowed por categoria
-    const { data: movesThisMonth } = await supabase
-      .from('overspend_moves')
-      .select('*')
-      .eq('month', monthKey)
-    setOverspendMoves(movesThisMonth ?? [])
-
     setLoading(false)
   }
 
@@ -86,7 +78,7 @@ export default function BudgetView({ refreshKey }) {
 
   const incomeGroup = groups.find((g) => g.name === 'Income')
   const expenseGroups = groups.filter((g) => g.name !== 'Income')
-  const summaries = computeCategorySummaries(categories, budgetEntries, transactions, monthKey, overspendMoves)
+  const summaries = computeCategorySummaries(categories, budgetEntries, transactions, monthKey)
   const toBeBudgeted = computeToBeBudgeted(categories, budgetEntries, transactions, monthKey)
 
   if (overspendTarget) {
@@ -352,9 +344,7 @@ export default function BudgetView({ refreshKey }) {
                         ) : (
                           <p className="sub" onClick={() => startEdit(cat)}>
                             Orçado {formatCurrency(cat.budgetedThisMonth)}
-                            {cat.lent > 0 && ` · emprestou ${formatCurrency(cat.lent)}`}
-                            {cat.activityThisMonth > 0 && ` · gasto ${formatCurrency(cat.activityThisMonth)}`}
-                            {cat.borrowed > 0 && ` · estourou ${formatCurrency(cat.borrowed)}`}
+                            {cat.activityThisMonth !== 0 && ` · Gasto ${formatCurrency(cat.activityThisMonth)}`}
                           </p>
                         )}
                       </div>
@@ -364,37 +354,17 @@ export default function BudgetView({ refreshKey }) {
                         {formatCurrency(cat.available)}
                       </span>
                     </div>
-                    {cat.budgetedThisMonth > 0 && (() => {
-                      const B = cat.budgetedThisMonth
-                      // Usar borrowed diretamente — o overspent calculado por activityThisMonth - B
-                      // não funciona quando o estouro vem de rollover acumulado de meses anteriores
-                      const greenPctRaw  = (Math.min(cat.activityThisMonth, B) / B) * 100
-                      const yellowPctRaw = (cat.borrowed / B) * 100
-                      const lentPctRaw   = (cat.lent / B) * 100
-
-                      const greenPct   = Math.max(0, greenPctRaw - yellowPctRaw)
-                      const afterGreen = 100 - greenPct
-                      const bothRaw    = yellowPctRaw + lentPctRaw
-                      const scale      = bothRaw > afterGreen && bothRaw > 0 ? afterGreen / bothRaw : 1
-                      const yellowPct  = yellowPctRaw * scale
-                      const lentPct    = lentPctRaw * scale
-                      return (
-                        <div className="progress-track thin">
-                          {greenPct > 0 && (
-                            <div className="progress-fill" style={{ width: `${greenPct}%`, background: 'var(--accent)' }} />
-                          )}
-                          {yellowPct > 0 && (
-                            <div className="progress-fill progress-borrowed" style={{ width: `${yellowPct}%` }} />
-                          )}
-                          {lentPct > 0 && (
-                            <div
-                              className={`progress-fill ${cat.borrowed > 0 ? 'progress-lent-yellow' : 'progress-lent'}`}
-                              style={{ width: `${lentPct}%` }}
-                            />
-                          )}
-                        </div>
-                      )
-                    })()}
+                    {cat.budgetedThisMonth > 0 && (
+                      <div className="progress-track thin">
+                        <div
+                          className="progress-fill"
+                          style={{
+                            width: `${catPct}%`,
+                            background: catOverBudget ? 'var(--danger)' : 'var(--accent)',
+                          }}
+                        />
+                      </div>
+                    )}
                     {isNegative && (
                       <button
                         type="button"

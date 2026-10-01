@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from './supabaseClient'
 import Login from './components/Login'
 import BudgetView from './components/BudgetView'
-import CategoryDetailView from './components/CategoryDetailView'
 import TransactionsView from './components/TransactionsView'
 import AddTransactionForm from './components/AddTransactionForm'
 import ReportsView from './components/ReportsView'
@@ -32,8 +31,6 @@ export default function App() {
   const [email, setEmail] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [headerHidden, setHeaderHidden] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState(null)
-  const [budgetViewMonth, setBudgetViewMonth] = useState(new Date())
 
   const contentRef = useRef(null)
   const lastScrollY = useRef(0)
@@ -62,7 +59,6 @@ export default function App() {
     setHeaderHidden(false)
     lastScrollY.current = 0
     if (contentRef.current) contentRef.current.scrollTop = 0
-    setSelectedCategory(null) // fecha detalhe ao trocar de aba
   }, [tab])
 
   function handleScroll(e) {
@@ -102,7 +98,7 @@ export default function App() {
   return (
     <>
       <AppHeader
-        title={tab === 'budget' && selectedCategory ? selectedCategory.name : (TAB_TITLES[tab] || 'Orçamento familiar')}
+        title={TAB_TITLES[tab] || 'Orçamento familiar'}
         email={email}
         hidden={headerHidden}
         onAvatarClick={() => setDrawerOpen(true)}
@@ -117,21 +113,7 @@ export default function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
           >
-            {tab === 'budget' && !selectedCategory && (
-              <BudgetView
-                refreshKey={refreshKey}
-                onCategorySelect={(cat) => setSelectedCategory(cat)}
-                onMonthChange={(m) => setBudgetViewMonth(m)}
-              />
-            )}
-            {tab === 'budget' && selectedCategory && (
-              <CategoryDetailView
-                category={selectedCategory}
-                month={budgetViewMonth}
-                onBack={() => setSelectedCategory(null)}
-                onDataChanged={() => setRefreshKey((k) => k + 1)}
-              />
-            )}
+            {tab === 'budget' && <BudgetView refreshKey={refreshKey} />}
             {tab === 'reports' && <ReportsView />}
             {tab === 'assistant' && <AssistantView month={month} />}
             {tab === 'transactions' && <TransactionsView refreshKey={refreshKey} />}
