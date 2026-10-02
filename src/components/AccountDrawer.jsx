@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../supabaseClient'
-import { IconX, IconSettings, IconInfo, IconLogout } from './icons'
+import { IconX, IconSettings, IconInfo, IconLogout, IconWallet } from './icons'
 
 function initialsFromEmail(email) {
   if (!email) return '?'
@@ -42,6 +42,10 @@ export default function AccountDrawer({ open, onClose, email, onNavigate }) {
             <p className="drawer-email">{email || '—'}</p>
 
             <nav className="drawer-nav">
+              <button className="drawer-nav-item" onClick={() => onNavigate('accounts')}>
+                <IconWallet size={20} />
+                <span>Contas</span>
+              </button>
               <button className="drawer-nav-item" onClick={() => onNavigate('settings')}>
                 <IconSettings size={20} />
                 <span>Configurações</span>

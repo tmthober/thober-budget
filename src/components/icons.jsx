@@ -151,3 +151,12 @@ export function IconAssistant({ size = 24 }) {
     </svg>
   )
 }
+export function IconWallet({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3" />
+      <rect x="3" y="7.5" width="18" height="12" rx="2" />
+      <path d="M16 13.5h2.5" />
+    </svg>
+  )
+}

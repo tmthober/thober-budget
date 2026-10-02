@@ -8,6 +8,7 @@ import AddTransactionForm from './components/AddTransactionForm'
 import ReportsView from './components/ReportsView'
 import AssistantView from './components/AssistantView'
 import SettingsView from './components/SettingsView'
+import AccountsView from './components/AccountsView'
 import AppHeader from './components/AppHeader'
 import AccountDrawer from './components/AccountDrawer'
 import { IconBudget, IconList, IconPlus, IconPieChart, IconAssistant } from './components/icons'
@@ -18,6 +19,7 @@ const TAB_TITLES = {
   add: 'Nova transação',
   reports: 'Relatórios',
   assistant: 'Assistente',
+  accounts: 'Contas',
   settings: 'Configurações',
   about: 'Sobre',
 }
@@ -88,7 +90,7 @@ export default function App() {
 
   function handleDrawerNavigate(destination) {
     setDrawerOpen(false)
-    setPreviousTab(tab === 'settings' || tab === 'about' ? previousTab : tab)
+    setPreviousTab(tab === 'settings' || tab === 'about' || tab === 'accounts' ? previousTab : tab)
     setTab(destination)
   }
 
@@ -120,6 +122,7 @@ export default function App() {
             {tab === 'add' && (
               <AddTransactionForm onSaved={handleTransactionSaved} onCancel={() => setTab(previousTab)} />
             )}
+            {tab === 'accounts' && <AccountsView />}
             {tab === 'settings' && <SettingsView />}
             {tab === 'about' && <SettingsView aboutOnly />}
           </motion.div>

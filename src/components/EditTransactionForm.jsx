@@ -15,6 +15,8 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
   const [groups, setGroups] = useState([])
   const [categories, setCategories] = useState([])
   const [categoryId, setCategoryId] = useState(transaction.category_id)
+  const [accounts, setAccounts] = useState([])
+  const [accountId, setAccountId] = useState(transaction.account_id ?? '')
   const [amountCents, setAmountCents] = useState(amountToCents(Math.abs(transaction.amount)))
   const [date, setDate] = useState(transaction.date)
   const [note, setNote] = useState(transaction.note ?? '')
@@ -26,12 +28,15 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
 
   useEffect(() => {
     async function load() {
-      const [g, c] = await Promise.all([
+      const [g, c, a] = await Promise.all([
         supabase.from('category_groups').select('*').order('sort_order'),
         supabase.from('categories').select('*').order('sort_order'),
+        supabase.from('accounts').select('*').order('sort_order'),
       ])
       setGroups(g.data ?? [])
       setCategories(c.data ?? [])
+      // Caixinhas só aparecem se a transação já pertence a uma (Etapa 1B cuida do resto).
+      setAccounts((a.data ?? []).filter((x) => x.type !== 'tracking' || x.id === transaction.account_id))
     }
     load()
   }, [])
@@ -55,6 +60,7 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
         amount: centsToAmount(amountCents),
         date,
         note: note || null,
+        ...(accountId ? { account_id: accountId } : {}),
       })
       .eq('id', transaction.id)
     setSaving(false)
@@ -130,6 +136,17 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
           />
           <CategoryStatus categoryId={categoryId} monthKey={monthKeyFromDateString(date)} />
         </div>
+
+        {accounts.length > 0 && (
+          <div className="form-field">
+            <label htmlFor="edit-account">Conta</label>
+            <select id="edit-account" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="form-field">
           <label htmlFor="edit-amount">Valor</label>
