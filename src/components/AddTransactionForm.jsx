@@ -14,6 +14,8 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
   const [groups, setGroups] = useState([])
   const [categories, setCategories] = useState([])
   const [categoryId, setCategoryId] = useState('')
+  const [accounts, setAccounts] = useState([])
+  const [accountId, setAccountId] = useState('')
   const [amountCents, setAmountCents] = useState(0)
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [note, setNote] = useState('')
@@ -23,12 +25,16 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
 
   useEffect(() => {
     async function load() {
-      const [g, c] = await Promise.all([
+      const [g, c, a] = await Promise.all([
         supabase.from('category_groups').select('*').order('sort_order'),
         supabase.from('categories').select('*').order('sort_order'),
+        supabase.from('accounts').select('*').neq('type', 'tracking').order('sort_order'),
       ])
       setGroups(g.data ?? [])
       setCategories(c.data ?? [])
+      const list = a.data ?? []
+      setAccounts(list)
+      if (list.length > 0) setAccountId(list[0].id)
     }
     load()
   }, [])
@@ -50,6 +56,7 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
       amount: centsToAmount(amountCents),
       date,
       note: note || null,
+      ...(accountId ? { account_id: accountId } : {}),
     })
     setSaving(false)
     if (insertError) {
@@ -104,6 +111,17 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
         />
         <CategoryStatus categoryId={categoryId} monthKey={monthKeyFromDateString(date)} />
       </div>
+
+      {accounts.length > 0 && (
+        <div className="form-field">
+          <label htmlFor="account">Conta</label>
+          <select id="account" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="form-field">
         <label htmlFor="amount">Valor</label>
