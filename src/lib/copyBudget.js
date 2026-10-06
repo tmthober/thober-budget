@@ -66,7 +66,7 @@ export async function loadCopyPreview(monthKey, categories) {
   const currEntries = currRes.data ?? []
   const prevMoves = movesRes.data ?? []
 
-  const eligible = new Set(categories.filter((c) => !c.is_income).map((c) => c.id))
+  const eligible = new Set(categories.filter((c) => !c.is_income && !c.is_card_payment).map((c) => c.id))
   const alreadyBudgeted = new Set(
     currEntries.filter((e) => Number(e.budgeted_amount) > 0).map((e) => e.category_id)
   )

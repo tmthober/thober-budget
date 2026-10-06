@@ -16,15 +16,17 @@ function formatAmountForCsv(amount) {
   return Number(amount).toFixed(2).replace('.', ',')
 }
 
-export function transactionsToCsv(transactions, categoriesById, groupsById) {
-  const header = ['Data', 'Grupo', 'Categoria', 'Valor', 'Observação']
+export function transactionsToCsv(transactions, categoriesById, groupsById, accountsById = {}) {
+  const header = ['Data', 'Tipo', 'Conta', 'Grupo', 'Categoria', 'Valor', 'Observação']
   const rows = transactions.map((t) => {
     const cat = categoriesById[t.category_id]
     const group = cat ? groupsById[cat.group_id] : null
     return [
       t.date,
+      t.kind === 'income' ? 'Entrada' : 'Gasto',
+      accountsById[t.account_id]?.name ?? '',
       group?.name ?? '',
-      cat?.name ?? 'Categoria removida',
+      cat?.name ?? (t.category_id ? 'Categoria removida' : ''),
       formatAmountForCsv(t.amount),
       t.note ?? '',
     ].map(escapeCsvField).join(';')

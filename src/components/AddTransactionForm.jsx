@@ -14,6 +14,7 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
   const [groups, setGroups] = useState([])
   const [categories, setCategories] = useState([])
   const [categoryId, setCategoryId] = useState('')
+  const [kind, setKind] = useState('expense')
   const [accounts, setAccounts] = useState([])
   const [accountId, setAccountId] = useState('')
   const [amountCents, setAmountCents] = useState(0)
@@ -28,21 +29,37 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
       const [g, c, a] = await Promise.all([
         supabase.from('category_groups').select('*').order('sort_order'),
         supabase.from('categories').select('*').order('sort_order'),
-        supabase.from('accounts').select('*').neq('type', 'tracking').order('sort_order'),
+        supabase.from('accounts').select('*').order('sort_order'),
       ])
       setGroups(g.data ?? [])
       setCategories(c.data ?? [])
       const list = a.data ?? []
       setAccounts(list)
-      if (list.length > 0) setAccountId(list[0].id)
+      const firstChecking = list.find((x) => x.type === 'checking') ?? list[0]
+      if (firstChecking) setAccountId(firstChecking.id)
     }
     load()
   }, [])
 
+  // Entrada não vai para cartão; gasto pode ir para qualquer conta.
+  const accountOptions = accounts.filter((a) => kind === 'expense' || a.type !== 'credit_card')
+  const selectedAccount = accounts.find((a) => a.id === accountId)
+  // Entrada e gasto de caixinha ficam fora do orçamento: sem categoria.
+  const needsCategory = kind === 'expense' && selectedAccount?.type !== 'tracking'
+  const pickableCategories = categories.filter((c) => !c.is_income && !c.is_card_payment)
+
+  function changeKind(next) {
+    setKind(next)
+    if (next === 'income' && selectedAccount?.type === 'credit_card') {
+      const firstChecking = accounts.find((a) => a.type === 'checking')
+      if (firstChecking) setAccountId(firstChecking.id)
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (!categoryId) {
+    if (needsCategory && !categoryId) {
       setError('Escolha uma categoria.')
       return
     }
@@ -52,7 +69,8 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
     }
     setSaving(true)
     const { error: insertError } = await supabase.from('transactions').insert({
-      category_id: categoryId,
+      kind,
+      category_id: needsCategory ? categoryId : null,
       amount: centsToAmount(amountCents),
       date,
       note: note || null,
@@ -70,10 +88,12 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
     setNote('')
 
     let overspend = null
-    try {
-      overspend = await checkOverspend(savedCategoryId, monthKey)
-    } catch {
-      overspend = null
+    if (needsCategory) {
+      try {
+        overspend = await checkOverspend(savedCategoryId, monthKey)
+      } catch {
+        overspend = null
+      }
     }
     if (overspend) {
       setOverspendInfo(overspend)
@@ -101,25 +121,51 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
 
   return (
     <form className="form-screen" onSubmit={handleSubmit}>
-      <div className="form-field">
-        <label htmlFor="category">Categoria</label>
-        <CategoryPicker
-          groups={groups}
-          categories={categories}
-          value={categoryId}
-          onChange={setCategoryId}
-        />
-        <CategoryStatus categoryId={categoryId} monthKey={monthKeyFromDateString(date)} />
+      <div className="kind-toggle" role="group" aria-label="Tipo de lançamento">
+        <button type="button" className={kind === 'expense' ? 'active' : ''} onClick={() => changeKind('expense')}>
+          Gasto
+        </button>
+        <button type="button" className={kind === 'income' ? 'active' : ''} onClick={() => changeKind('income')}>
+          Entrada
+        </button>
       </div>
 
       {accounts.length > 0 && (
         <div className="form-field">
           <label htmlFor="account">Conta</label>
           <select id="account" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-            {accounts.map((a) => (
+            {accountOptions.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </select>
+          {kind === 'expense' && selectedAccount?.type === 'credit_card' && (
+            <p className="category-status neutral">
+              Compra no cartão: o valor também é reservado em Pagamento do cartão.
+            </p>
+          )}
+          {selectedAccount?.type === 'tracking' && (
+            <p className="category-status neutral">
+              Caixinha fica fora do orçamento: este lançamento não usa categoria.
+            </p>
+          )}
+          {kind === 'income' && selectedAccount?.type === 'checking' && (
+            <p className="category-status neutral">
+              A entrada vai para "Pronto para orçar".
+            </p>
+          )}
+        </div>
+      )}
+
+      {needsCategory && (
+        <div className="form-field">
+          <label htmlFor="category">Categoria</label>
+          <CategoryPicker
+            groups={groups}
+            categories={pickableCategories}
+            value={categoryId}
+            onChange={setCategoryId}
+          />
+          <CategoryStatus categoryId={categoryId} monthKey={monthKeyFromDateString(date)} />
         </div>
       )}
 
@@ -147,7 +193,7 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
         whileTap={{ scale: 0.97 }}
         transition={{ duration: 0.1 }}
       >
-        {saving ? 'Salvando...' : 'Salvar lançamento'}
+        {saving ? 'Salvando...' : kind === 'income' ? 'Salvar entrada' : 'Salvar lançamento'}
       </motion.button>
 
       <button

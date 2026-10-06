@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 import { IconChevronLeft, IconChevronRight, IconSearch } from './icons'
 import {
   formatCurrency, formatMonthLabel, addMonths, toMonthKey,
-  computeCategorySummaries, computeToBeBudgeted,
+  computeCategorySummaries, computeToBeBudgeted, withCardPaymentActivity,
 } from '../lib/budget'
 import { fetchOverspendMoves, summarizeOverspendMoves } from '../lib/overspendHistory'
 import { useToast } from '../lib/ToastContext'
@@ -20,6 +20,8 @@ export default function BudgetView({ refreshKey }) {
   const [categories, setCategories] = useState([])
   const [budgetEntries, setBudgetEntries] = useState([])
   const [transactions, setTransactions] = useState([])
+  const [accounts, setAccounts] = useState([])
+  const [transfers, setTransfers] = useState([])
   const [overspendStats, setOverspendStats] = useState({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -41,13 +43,15 @@ export default function BudgetView({ refreshKey }) {
   async function loadData() {
     setLoading(true)
     setLoadError(false)
-    const [g, c, b, t] = await Promise.all([
+    const [g, c, b, t, a, tr] = await Promise.all([
       supabase.from('category_groups').select('*').order('sort_order'),
       supabase.from('categories').select('*').order('sort_order'),
       supabase.from('budget_entries').select('*'),
       supabase.from('transactions').select('*'),
+      supabase.from('accounts').select('*'),
+      supabase.from('account_transfers').select('*'),
     ])
-    if (g.error || c.error || b.error || t.error) {
+    if (g.error || c.error || b.error || t.error || a.error || tr.error) {
       setLoadError(true)
       setLoading(false)
       return
@@ -56,6 +60,8 @@ export default function BudgetView({ refreshKey }) {
     setCategories(c.data ?? [])
     setBudgetEntries(b.data ?? [])
     setTransactions(t.data ?? [])
+    setAccounts(a.data ?? [])
+    setTransfers(tr.data ?? [])
 
     const { moves } = await fetchOverspendMoves(historyStartKey, monthKey)
     setOverspendStats(summarizeOverspendMoves(moves))
@@ -80,8 +86,9 @@ export default function BudgetView({ refreshKey }) {
 
   const incomeGroup = groups.find((g) => g.name === 'Income')
   const expenseGroups = groups.filter((g) => g.name !== 'Income')
-  const summaries = computeCategorySummaries(categories, budgetEntries, transactions, monthKey)
-  const toBeBudgeted = computeToBeBudgeted(categories, budgetEntries, transactions, monthKey)
+  const effectiveTransactions = withCardPaymentActivity(transactions, accounts, transfers, categories)
+  const summaries = computeCategorySummaries(categories, budgetEntries, effectiveTransactions, monthKey)
+  const toBeBudgeted = computeToBeBudgeted(categories, budgetEntries, accounts, transactions, transfers, monthKey)
 
   if (overspendTarget) {
     return (
@@ -103,9 +110,12 @@ export default function BudgetView({ refreshKey }) {
     )
   }
 
-  const expenseSummaries = summaries.filter((s) => s.group_id !== incomeGroup?.id)
-  const totalBudgetedThisMonth = expenseSummaries.reduce((sum, s) => sum + s.budgetedThisMonth, 0)
-  const totalActivityThisMonth = expenseSummaries.reduce((sum, s) => sum + s.activityThisMonth, 0)
+  const expenseSummaries = summaries.filter((s) => s.group_id !== incomeGroup?.id && !s.is_income)
+  // Pagamento do cartão não entra no "Gasto do mês": a compra no cartão já é
+  // contada na categoria em que foi feita.
+  const spendingSummaries = expenseSummaries.filter((s) => !s.is_card_payment)
+  const totalBudgetedThisMonth = spendingSummaries.reduce((sum, s) => sum + s.budgetedThisMonth, 0)
+  const totalActivityThisMonth = spendingSummaries.reduce((sum, s) => sum + s.activityThisMonth, 0)
   const totalRemaining = totalBudgetedThisMonth - totalActivityThisMonth
   const monthPct = totalBudgetedThisMonth > 0
     ? Math.min((totalActivityThisMonth / totalBudgetedThisMonth) * 100, 100)
@@ -432,10 +442,25 @@ export default function BudgetView({ refreshKey }) {
                             )}
                           </>
                         ) : (
-                          <p className="sub" onClick={() => startEdit(cat)}>
-                            Orçado {formatCurrency(cat.budgetedThisMonth)}
-                            {cat.activityThisMonth !== 0 && ` · Gasto ${formatCurrency(cat.activityThisMonth)}`}
-                          </p>
+                          cat.is_card_payment ? (
+                            <>
+                              <p className="sub">
+                                {cat.activityThisMonth < 0
+                                  ? `Reservado no mês ${formatCurrency(-cat.activityThisMonth)}`
+                                  : cat.activityThisMonth > 0
+                                    ? `Fatura paga no mês ${formatCurrency(cat.activityThisMonth)}`
+                                    : 'Reserva automática das compras no cartão'}
+                              </p>
+                              <p className="sub" onClick={() => startEdit(cat)}>
+                                Orçado {formatCurrency(cat.budgetedThisMonth)}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="sub" onClick={() => startEdit(cat)}>
+                              Orçado {formatCurrency(cat.budgetedThisMonth)}
+                              {cat.activityThisMonth !== 0 && ` · Gasto ${formatCurrency(cat.activityThisMonth)}`}
+                            </p>
+                          )
                         )}
                       </div>
                       <span className="available" style={{

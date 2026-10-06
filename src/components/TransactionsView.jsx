@@ -14,6 +14,7 @@ export default function TransactionsView({ refreshKey }) {
   const [transactions, setTransactions] = useState([])
   const [categories, setCategories] = useState([])
   const [groups, setGroups] = useState([])
+  const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [editingTx, setEditingTx] = useState(null)
@@ -29,12 +30,13 @@ export default function TransactionsView({ refreshKey }) {
   async function load() {
     setLoading(true)
     setLoadError(false)
-    const [t, c, g] = await Promise.all([
+    const [t, c, g, a] = await Promise.all([
       supabase.from('transactions').select('*'),
       supabase.from('categories').select('*'),
       supabase.from('category_groups').select('*'),
+      supabase.from('accounts').select('*'),
     ])
-    if (t.error || c.error || g.error) {
+    if (t.error || c.error || g.error || a.error) {
       setLoadError(true)
       setLoading(false)
       return
@@ -42,6 +44,7 @@ export default function TransactionsView({ refreshKey }) {
     setTransactions(t.data ?? [])
     setCategories(c.data ?? [])
     setGroups(g.data ?? [])
+    setAccounts(a.data ?? [])
     setLoading(false)
   }
 
@@ -79,12 +82,15 @@ export default function TransactionsView({ refreshKey }) {
 
   const categoriesById = Object.fromEntries(categories.map((c) => [c.id, c]))
   const groupsById = Object.fromEntries(groups.map((g) => [g.id, g]))
+  const accountsById = Object.fromEntries(accounts.map((a) => [a.id, a]))
+  const filterCategories = categories.filter((c) => !c.is_income && !c.is_card_payment)
+  const filterGroups = groups.filter((g) => filterCategories.some((c) => c.group_id === g.id))
 
   if (showFilters) {
     return (
       <TransactionFilters
-        groups={groups}
-        categories={categories}
+        groups={filterGroups}
+        categories={filterCategories}
         preset={preset}
         setPreset={setPreset}
         customStart={customStart}
@@ -144,7 +150,7 @@ export default function TransactionsView({ refreshKey }) {
       showToast('Nada para exportar nesse filtro', 'error')
       return
     }
-    const csv = transactionsToCsv(sorted, categoriesById, groupsById)
+    const csv = transactionsToCsv(sorted, categoriesById, groupsById, accountsById)
     const filename = range
       ? `transacoes_${range.start}_a_${range.end}.csv`
       : 'transacoes_todas.csv'
@@ -176,13 +182,22 @@ export default function TransactionsView({ refreshKey }) {
       ) : (
         sorted.map((tx) => {
           const cat = categoriesById[tx.category_id]
-          const isIncome = cat?.is_income
+          const isIncome = tx.kind === 'income'
+          const accountName = accountsById[tx.account_id]?.name
+          const title = isIncome
+            ? 'Entrada'
+            : cat
+              ? cat.name
+              : tx.category_id
+                ? 'Categoria removida'
+                : 'Sem categoria'
           return (
             <button className="tx-row" key={tx.id} onClick={() => setEditingTx(tx)}>
               <div>
-                <p className="name">{cat ? cat.name : 'Categoria removida'}</p>
+                <p className="name">{title}</p>
                 <p className="meta">
                   {new Date(tx.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                  {accountName && ` · ${accountName}`}
                   {tx.note && ` · ${tx.note}`}
                 </p>
               </div>

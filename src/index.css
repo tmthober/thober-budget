@@ -990,3 +990,27 @@ input, select, textarea {
   color: var(--ink-soft);
 }
 .link-btn.danger { color: var(--danger); }
+
+/* ---- Tipo de lançamento (Etapa 1B) ---- */
+.kind-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.kind-toggle button {
+  flex: 1;
+  padding: 11px 0;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.kind-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+}

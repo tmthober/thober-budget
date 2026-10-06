@@ -41,7 +41,7 @@ export default function OverspendWarning({ overspendInfo, categories, onResolve 
 
   const summaries = computeCategorySummaries(categories, budgetEntries, transactions, monthKey)
   const options = summaries
-    .filter((c) => c.id !== category.id && !c.is_income && c.available > 0)
+    .filter((c) => c.id !== category.id && !c.is_income && !c.is_card_payment && c.available > 0)
     .sort((a, b) => b.available - a.available)
 
   // Quantas vezes ANTES desta a categoria já precisou de cobertura, nos

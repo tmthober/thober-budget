@@ -1,9 +1,9 @@
 // Contas (corrente, cartão, caixinhas) — Etapa 1A.
-// Nesta etapa os saldos das contas são INFORMATIVOS: não alteram "Pronto para
-// orçar" nem o disponível das categorias (isso entra na Etapa 1B).
+// Desde a Etapa 1B, o saldo das contas correntes alimenta o "Pronto para orçar"
+// (ver computeToBeBudgeted em budget.js).
 //
 // Saldo = saldo inicial
-//         + renda (categoria is_income) − gastos, das transações da conta
+//         + entradas (kind 'income') − gastos (kind 'expense'), da conta
 //         + transferências recebidas − transferências enviadas
 // Toda a aritmética é feita em centavos (inteiros) para evitar erro de float.
 
@@ -24,7 +24,7 @@ async function fetchAllTransactions() {
   for (;;) {
     const { data, error } = await supabase
       .from('transactions')
-      .select('id, category_id, account_id, amount')
+      .select('id, category_id, account_id, amount, kind, date')
       .order('id')
       .range(from, from + pageSize - 1)
     if (error) throw error
@@ -57,15 +57,14 @@ export async function loadAccountsData() {
 }
 
 // Retorna { [accountId]: saldo } em reais.
-export function computeBalances({ accounts, transactions, transfers, categories }) {
-  const incomeIds = new Set(categories.filter((c) => c.is_income).map((c) => c.id))
+export function computeBalances({ accounts, transactions, transfers }) {
   const cents = {}
   accounts.forEach((acc) => { cents[acc.id] = toCents(acc.starting_balance) })
 
   transactions.forEach((t) => {
     if (cents[t.account_id] === undefined) return
     const v = toCents(t.amount)
-    cents[t.account_id] += incomeIds.has(t.category_id) ? v : -v
+    cents[t.account_id] += t.kind === 'income' ? v : -v
   })
   transfers.forEach((t) => {
     const v = toCents(t.amount)

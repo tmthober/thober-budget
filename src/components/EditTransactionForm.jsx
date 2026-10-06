@@ -14,7 +14,7 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
   const showToast = useToast()
   const [groups, setGroups] = useState([])
   const [categories, setCategories] = useState([])
-  const [categoryId, setCategoryId] = useState(transaction.category_id)
+  const [categoryId, setCategoryId] = useState(transaction.category_id ?? '')
   const [accounts, setAccounts] = useState([])
   const [accountId, setAccountId] = useState(transaction.account_id ?? '')
   const [amountCents, setAmountCents] = useState(amountToCents(Math.abs(transaction.amount)))
@@ -35,16 +35,21 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
       ])
       setGroups(g.data ?? [])
       setCategories(c.data ?? [])
-      // Caixinhas só aparecem se a transação já pertence a uma (Etapa 1B cuida do resto).
-      setAccounts((a.data ?? []).filter((x) => x.type !== 'tracking' || x.id === transaction.account_id))
+      setAccounts(a.data ?? [])
     }
     load()
   }, [])
 
+  const kind = transaction.kind ?? 'expense'
+  const accountOptions = accounts.filter((a) => kind === 'expense' || a.type !== 'credit_card')
+  const selectedAccount = accounts.find((a) => a.id === accountId)
+  const needsCategory = kind === 'expense' && selectedAccount?.type !== 'tracking'
+  const pickableCategories = categories.filter((c) => !c.is_income && !c.is_card_payment)
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (!categoryId) {
+    if (needsCategory && !categoryId) {
       setError('Escolha uma categoria.')
       return
     }
@@ -56,7 +61,7 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
     const { error: updateError } = await supabase
       .from('transactions')
       .update({
-        category_id: categoryId,
+        category_id: needsCategory ? categoryId : null,
         amount: centsToAmount(amountCents),
         date,
         note: note || null,
@@ -71,10 +76,12 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
 
     const monthKey = monthKeyFromDateString(date)
     let overspend = null
-    try {
-      overspend = await checkOverspend(categoryId, monthKey)
-    } catch {
-      overspend = null
+    if (needsCategory) {
+      try {
+        overspend = await checkOverspend(categoryId, monthKey)
+      } catch {
+        overspend = null
+      }
     }
     if (overspend) {
       setOverspendInfo(overspend)
@@ -121,30 +128,37 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
         <button className="icon-btn" onClick={onBack} aria-label="Voltar">
           <IconChevronLeft />
         </button>
-        <span>Editar lançamento</span>
+        <span>{kind === 'income' ? 'Editar entrada' : 'Editar lançamento'}</span>
         <span style={{ width: 44 }} />
       </div>
 
       <form className="form-screen" onSubmit={handleSubmit}>
-        <div className="form-field">
-          <label htmlFor="edit-category">Categoria</label>
-          <CategoryPicker
-            groups={groups}
-            categories={categories}
-            value={categoryId}
-            onChange={setCategoryId}
-          />
-          <CategoryStatus categoryId={categoryId} monthKey={monthKeyFromDateString(date)} />
-        </div>
-
         {accounts.length > 0 && (
           <div className="form-field">
             <label htmlFor="edit-account">Conta</label>
             <select id="edit-account" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              {accounts.map((a) => (
+              {accountOptions.map((a) => (
                 <option key={a.id} value={a.id}>{a.name}</option>
               ))}
             </select>
+            {selectedAccount?.type === 'tracking' && (
+              <p className="category-status neutral">
+                Caixinha fica fora do orçamento: este lançamento não usa categoria.
+              </p>
+            )}
+          </div>
+        )}
+
+        {needsCategory && (
+          <div className="form-field">
+            <label htmlFor="edit-category">Categoria</label>
+            <CategoryPicker
+              groups={groups}
+              categories={pickableCategories}
+              value={categoryId}
+              onChange={setCategoryId}
+            />
+            <CategoryStatus categoryId={categoryId} monthKey={monthKeyFromDateString(date)} />
           </div>
         )}
 
