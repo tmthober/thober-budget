@@ -47,7 +47,6 @@ type Ctx = {
     name: string;
     group: string;
     isIncome: boolean;
-    isCardPayment: boolean;
     budgeted: number;
     activity: number;
     available: number;
@@ -73,16 +72,14 @@ function monthsBefore(month: string, n: number): string[] {
 }
 
 async function buildContext(supabase: any, month: string, today: string): Promise<Ctx> {
-  const [groupsRes, catsRes, budgetsRes, txRes, accRes, trRes] = await Promise.all([
+  const [groupsRes, catsRes, budgetsRes, txRes] = await Promise.all([
     supabase.from("category_groups").select("id, name, sort_order"),
-    supabase.from("categories").select("id, group_id, name, sort_order, is_income, is_card_payment"),
+    supabase.from("categories").select("id, group_id, name, sort_order, is_income"),
     supabase.from("budget_entries").select("category_id, month, budgeted_amount"),
-    supabase.from("transactions").select("category_id, date, amount, kind, account_id"),
-    supabase.from("accounts").select("id, type, starting_balance"),
-    supabase.from("account_transfers").select("date, from_account_id, to_account_id, amount"),
+    supabase.from("transactions").select("category_id, date, amount"),
   ]);
 
-  for (const r of [groupsRes, catsRes, budgetsRes, txRes, accRes, trRes]) {
+  for (const r of [groupsRes, catsRes, budgetsRes, txRes]) {
     if (r.error) throw new Error(r.error.message);
   }
 
@@ -125,7 +122,6 @@ async function buildContext(supabase: any, month: string, today: string): Promis
         name: c.name,
         group: groupName.get(c.group_id) ?? "—",
         isIncome: !!c.is_income,
-        isCardPayment: !!c.is_card_payment,
         budgeted: budgetedMonth,
         activity: activityMonth,
         available: c.is_income ? 0 : budgetedCum - activityCum,
@@ -133,41 +129,22 @@ async function buildContext(supabase: any, month: string, today: string): Promis
       };
     });
 
-  // Pronto para orçar (igual ao app) = saldo das contas correntes até o mês
-  // − soma dos disponíveis de todos os envelopes (incluindo Pagamento do cartão).
-  const cents = (v: any) => Math.round((Number(v) || 0) * 100);
-  const accounts = accRes.data ?? [];
-  const checkingIds = new Set(accounts.filter((a: any) => a.type === "checking").map((a: any) => a.id));
-  const cardIds = new Set(accounts.filter((a: any) => a.type === "credit_card").map((a: any) => a.id));
-
-  let cash = 0;
-  for (const a of accounts) {
-    if (checkingIds.has(a.id)) cash += cents(a.starting_balance);
-  }
-  let cardReserve = 0; // compras no cartão − pagamentos de fatura (até o mês)
+  // Pronto para orçar = receita acumulada − orçado acumulado (aproximação do app)
+  let incomeCum = 0;
   for (const t of txRes.data ?? []) {
-    if (String(t.date).slice(0, 7) > month) continue;
-    if (checkingIds.has(t.account_id)) {
-      cash += t.kind === "income" ? cents(t.amount) : -cents(t.amount);
-    }
-    if (t.kind === "expense" && t.category_id && cardIds.has(t.account_id)) {
-      cardReserve += cents(t.amount);
+    const cat = cats.find((c: any) => c.id === t.category_id);
+    if (cat?.isIncome && String(t.date).slice(0, 7) <= month) {
+      incomeCum += Number(t.amount) || 0;
     }
   }
-  for (const tr of trRes.data ?? []) {
-    if (String(tr.date).slice(0, 7) > month) continue;
-    if (checkingIds.has(tr.to_account_id)) cash += cents(tr.amount);
-    if (checkingIds.has(tr.from_account_id)) cash -= cents(tr.amount);
-    if (cardIds.has(tr.to_account_id) && !cardIds.has(tr.from_account_id)) {
-      cardReserve -= cents(tr.amount);
+  let budgetedAllCum = 0;
+  for (const b of budgetsRes.data ?? []) {
+    if (String(b.month).slice(0, 7) <= month) {
+      budgetedAllCum += Number(b.budgeted_amount) || 0;
     }
-  }
-  let envelopes = cardReserve;
-  for (const c of cats) {
-    if (!c.isIncome) envelopes += cents(c.available);
   }
 
-  const spend = cats.filter((c: any) => !c.isIncome && !c.isCardPayment);
+  const spend = cats.filter((c: any) => !c.isIncome);
   const dim = daysInMonthOf(month);
   const day = today.slice(0, 7) === month ? Number(today.slice(8, 10)) : dim;
 
@@ -178,7 +155,7 @@ async function buildContext(supabase: any, month: string, today: string): Promis
     daysInMonth: dim,
     daysLeft: Math.max(0, dim - day),
     monthProgressPct: Math.round((day / dim) * 100),
-    readyToAssign: (cash - envelopes) / 100,
+    readyToAssign: incomeCum - budgetedAllCum,
     totals: {
       budgeted: spend.reduce((s: number, c: any) => s + c.budgeted, 0),
       activity: spend.reduce((s: number, c: any) => s + c.activity, 0),
