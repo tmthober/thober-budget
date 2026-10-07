@@ -1049,3 +1049,16 @@ input, select, textarea {
 .name-link { cursor: pointer; }
 .name-chevron { color: var(--ink-soft); font-weight: 400; margin-left: 2px; }
 .detail-target { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }
+
+/* ---- Atribuir para cumprir as metas (Etapa 3) ---- */
+.auto-list { max-height: 260px; overflow-y: auto; margin-top: 8px; }
+.auto-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.auto-row.partial { color: #a8741a; }
+.auto-row.none { color: var(--ink-soft); }

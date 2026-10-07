@@ -10,7 +10,7 @@ import {
 import { fetchOverspendMoves, summarizeOverspendMoves } from '../lib/overspendHistory'
 import { useToast } from '../lib/ToastContext'
 import OverspendWarning from './OverspendWarning'
-import { loadCopyPreview, applyCopyBudget } from '../lib/copyBudget'
+import { planAutoAssign, applyAutoAssign } from '../lib/autoAssign'
 
 const HISTORY_WINDOW_MONTHS = 3
 
@@ -41,7 +41,7 @@ export default function BudgetView({ refreshKey }) {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [addCategoryError, setAddCategoryError] = useState(null)
   const [savingCategory, setSavingCategory] = useState(false)
-  const [copyPanel, setCopyPanel] = useState(null)
+  const [autoPanel, setAutoPanel] = useState(null)
   const [detailCatId, setDetailCatId] = useState(null)
 
   const monthKey = toMonthKey(month)
@@ -78,7 +78,7 @@ export default function BudgetView({ refreshKey }) {
     setLoading(false)
   }
 
-  useEffect(() => { loadData(); setCopyPanel(null) }, [refreshKey, monthKey])
+  useEffect(() => { loadData(); setAutoPanel(null) }, [refreshKey, monthKey])
 
   if (loading) return <div className="empty-state">Carregando orçamento...</div>
 
@@ -211,26 +211,22 @@ export default function BudgetView({ refreshKey }) {
     })
   }
 
-  async function openCopyPanel() {
-    setCopyPanel({ status: 'loading' })
-    const result = await loadCopyPreview(monthKey, categories)
-    if (result.error) {
-      setCopyPanel({ status: 'error' })
-      return
-    }
-    setCopyPanel({ status: 'ready', preview: result })
+  function openAutoPanel() {
+    setAutoPanel({
+      status: 'ready',
+      plan: planAutoAssign({ groups, summaries, targets, missingFor, toBeBudgeted }),
+    })
   }
-
-  async function confirmCopy() {
-    const panel = copyPanel
-    setCopyPanel({ ...panel, status: 'saving' })
-    const { error } = await applyCopyBudget(panel.preview.rows)
+  async function confirmAutoAssign() {
+    const panel = autoPanel
+    setAutoPanel({ ...panel, status: 'saving' })
+    const { error } = await applyAutoAssign(panel.plan.rows, monthKey)
     if (error) {
-      setCopyPanel({ ...panel, status: 'error' })
+      setAutoPanel({ ...panel, status: 'error' })
       return
     }
-    setCopyPanel(null)
-    showToast('Orçado copiado do mês anterior')
+    setAutoPanel(null)
+    showToast('Metas atribuídas')
     loadData()
   }
 
@@ -362,70 +358,87 @@ export default function BudgetView({ refreshKey }) {
         </button>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        {!copyPanel ? (
-          <button type="button" className="secondary-btn" onClick={openCopyPanel}>
-            Copiar orçado de {formatMonthLabel(addMonths(month, -1))}
-          </button>
-        ) : (
-          <div className="category-row">
-            {copyPanel.status === 'loading' && <p className="sub">Calculando valores originais...</p>}
-            {copyPanel.status === 'error' && (
-              <>
+      {monthKey >= toMonthKey(new Date()) && (
+        <div style={{ marginBottom: 12 }}>
+          {!autoPanel ? (
+            <button type="button" className="secondary-btn" onClick={openAutoPanel}>
+              Atribuir para cumprir as metas
+            </button>
+          ) : (
+            <div className="category-row">
+              {autoPanel.status === 'error' && (
                 <p className="edit-error-text">
-                  Não foi possível copiar. Nada foi alterado ou parte falhou — verifique a internet e tente de novo (só categorias zeradas são tocadas).
+                  Não foi possível atribuir. Nada foi alterado: verifique a internet e tente de novo.
                 </p>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button type="button" className="secondary-btn" onClick={openCopyPanel}>Tentar novamente</button>
-                  <button type="button" className="secondary-btn" onClick={() => setCopyPanel(null)}>Fechar</button>
-                </div>
-              </>
-            )}
-            {(copyPanel.status === 'ready' || copyPanel.status === 'saving') && (() => {
-              const p = copyPanel.preview
-              const saving = copyPanel.status === 'saving'
-              if (p.rows.length === 0) {
+              )}
+              {(() => {
+                const p = autoPanel.plan
+                const saving = autoPanel.status === 'saving'
+                const close = (
+                  <button type="button" className="secondary-btn" style={{ marginTop: 8 }} onClick={() => setAutoPanel(null)}>
+                    Fechar
+                  </button>
+                )
+                if (Object.keys(targets).length === 0) {
+                  return (
+                    <>
+                      <p className="sub">Você ainda não definiu metas. Toque em "+ Definir meta" nas categorias.</p>
+                      {close}
+                    </>
+                  )
+                }
+                if (p.rows.length === 0) {
+                  return (
+                    <>
+                      <p className="sub">Todas as metas já estão cumpridas neste mês.</p>
+                      {close}
+                    </>
+                  )
+                }
+                if (p.available <= 0) {
+                  return (
+                    <>
+                      <p className="sub">
+                        Não há dinheiro em Pronto para orçar para atribuir. Faltam {formatCurrency(p.totalMissing)} para as metas.
+                      </p>
+                      {close}
+                    </>
+                  )
+                }
                 return (
                   <>
+                    <p className="name">Atribuir para cumprir as metas</p>
                     <p className="sub">
-                      {p.prevEmpty
-                        ? 'O mês anterior não tem orçamento para copiar.'
-                        : 'Nada para copiar: as categorias do mês anterior já têm orçado neste mês.'}
+                      Serão atribuídos {formatCurrency(p.totalAssign)} de {formatCurrency(p.totalMissing)} que faltam
+                      (Pronto para orçar: {formatCurrency(p.available)}). O que já foi atribuído não muda.
                     </p>
-                    <button type="button" className="secondary-btn" style={{ marginTop: 8 }} onClick={() => setCopyPanel(null)}>
-                      Fechar
-                    </button>
+                    <div className="auto-list">
+                      {p.rows.map((r) => (
+                        <div className={`auto-row ${r.status}`} key={r.id}>
+                          <span>
+                            {r.name}
+                            {r.status === 'partial' && ` (parcial, faltariam ${formatCurrency(r.missing - r.assign)})`}
+                            {r.status === 'none' && ' (sem dinheiro)'}
+                          </span>
+                          <span>{formatCurrency(r.assign)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <button type="button" className="secondary-btn" onClick={confirmAutoAssign} disabled={saving || p.totalAssign <= 0}>
+                        {saving ? 'Atribuindo...' : 'Atribuir'}
+                      </button>
+                      <button type="button" className="secondary-btn" onClick={() => setAutoPanel(null)} disabled={saving}>
+                        Cancelar
+                      </button>
+                    </div>
                   </>
                 )
-              }
-              return (
-                <>
-                  <p className="name">Copiar orçado original</p>
-                  <p className="sub">
-                    {p.rows.length} {p.rows.length === 1 ? 'categoria sem orçado' : 'categorias sem orçado'} neste mês
-                    receberão o valor planejado de {formatMonthLabel(addMonths(month, -1))}, antes de estouros e empréstimos.
-                    Total: {formatCurrency(p.total)}.
-                  </p>
-                  {p.adjusted > 0 && (
-                    <p className="sub">{p.adjusted} delas tiveram o valor ajustado por cobertura — o ajuste não é copiado.</p>
-                  )}
-                  {p.keptExisting > 0 && (
-                    <p className="sub">{p.keptExisting} que já têm orçado neste mês ficam como estão.</p>
-                  )}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    <button type="button" className="secondary-btn" onClick={confirmCopy} disabled={saving}>
-                      {saving ? 'Copiando...' : 'Copiar'}
-                    </button>
-                    <button type="button" className="secondary-btn" onClick={() => setCopyPanel(null)} disabled={saving}>
-                      Cancelar
-                    </button>
-                  </div>
-                </>
-              )
-            })()}
-          </div>
-        )}
-      </div>
+              })()}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="tobudget-card">
         <p className="label">Pronto para orçar</p>
