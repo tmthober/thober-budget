@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '../supabaseClient'
 import CategoryPicker from './CategoryPicker'
 import CategoryStatus from './CategoryStatus'
+import AccountStatus from './AccountStatus'
 import CurrencyInput, { centsToAmount } from './CurrencyInput'
 import OverspendWarning from './OverspendWarning'
 import { monthKeyFromDateString } from '../lib/budget'
@@ -17,6 +18,7 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
   const [kind, setKind] = useState('expense')
   const [accounts, setAccounts] = useState([])
   const [accountId, setAccountId] = useState('')
+  const [balanceRefresh, setBalanceRefresh] = useState(0)
   const [amountCents, setAmountCents] = useState(0)
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [note, setNote] = useState('')
@@ -85,6 +87,7 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
     const savedCategoryId = categoryId
     const monthKey = monthKeyFromDateString(date)
     setAmountCents(0)
+    setBalanceRefresh((n) => n + 1)
     setNote('')
 
     let overspend = null
@@ -142,6 +145,9 @@ export default function AddTransactionForm({ onSaved, onCancel }) {
             <p className="category-status neutral">
               Compra no cartão: o valor também é reservado em Pagamento do cartão.
             </p>
+          )}
+          {selectedAccount?.type === 'tracking' && (
+            <AccountStatus accountId={selectedAccount.id} refreshKey={balanceRefresh} />
           )}
           {selectedAccount?.type === 'tracking' && (
             <p className="category-status neutral">
