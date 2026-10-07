@@ -44,6 +44,84 @@ function ScreenHeader({ title, onBack }) {
   )
 }
 
+// Movimentações de uma conta: lançamentos (gastos/entradas) e transferências,
+// da mais recente para a mais antiga.
+function AccountDetail({ account, data, balance, onBack, onEdit }) {
+  const accountsById = Object.fromEntries(data.accounts.map((a) => [a.id, a]))
+  const categoriesById = Object.fromEntries(data.categories.map((c) => [c.id, c]))
+
+  const items = []
+  data.transactions.forEach((t) => {
+    if (t.account_id !== account.id) return
+    const isIncome = t.kind === 'income'
+    items.push({
+      key: `tx-${t.id}`,
+      date: t.date,
+      title: isIncome ? 'Entrada' : categoriesById[t.category_id]?.name ?? 'Gasto',
+      note: t.note,
+      value: (isIncome ? 1 : -1) * Number(t.amount),
+    })
+  })
+  data.transfers.forEach((t) => {
+    const isIn = t.to_account_id === account.id
+    if (!isIn && t.from_account_id !== account.id) return
+    const other = accountsById[isIn ? t.from_account_id : t.to_account_id]?.name ?? '?'
+    items.push({
+      key: `tr-${t.id}`,
+      date: t.date,
+      title: isIn ? `Transferência de ${other}` : `Transferência para ${other}`,
+      note: t.note,
+      value: (isIn ? 1 : -1) * Number(t.amount),
+    })
+  })
+  items.sort((a, b) => b.date.localeCompare(a.date))
+  const LIMIT = 100
+  const shown = items.slice(0, LIMIT)
+
+  return (
+    <div>
+      <ScreenHeader title={account.name} onBack={onBack} />
+      <div className="accounts-actions" style={{ alignItems: 'center' }}>
+        <div style={{ flex: 1 }}>
+          <p className="meta" style={{ margin: 0 }}>{accountMeta(account)}</p>
+          <p className={amtClass(balance)} style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
+            {formatCurrency(balance)}
+          </p>
+        </div>
+        <button className="secondary-btn" onClick={onEdit} style={{ flex: 'none' }}>
+          Editar conta
+        </button>
+      </div>
+
+      <p className="group-title"><span>Movimentações</span><span>{items.length}</span></p>
+      {items.length === 0 ? (
+        <div className="empty-state" style={{ padding: '20px 24px' }}>Nenhuma movimentação ainda.</div>
+      ) : (
+        shown.map((it) => (
+          <div className="tx-row transfer-row" key={it.key}>
+            <div>
+              <p className="name">{it.title}</p>
+              <p className="meta">
+                {formatDate(it.date)}
+                {it.note && ` · ${it.note}`}
+              </p>
+            </div>
+            <span className={it.value > 0 ? 'amt income' : 'amt'}>
+              {it.value > 0 ? '+ ' : '− '}
+              {formatCurrency(Math.abs(it.value))}
+            </span>
+          </div>
+        ))
+      )}
+      {items.length > LIMIT && (
+        <p className="meta" style={{ textAlign: 'center', padding: 12 }}>
+          Mostrando as {LIMIT} mais recentes de {items.length}.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function AccountEditor({ account, currentBalance, accounts, hasMovements, onBack, onSaved }) {
   const showToast = useToast()
   const isNew = !account
@@ -403,6 +481,18 @@ export default function AccountsView() {
     return <TransferForm accounts={accounts} onBack={() => backToList(false)} onSaved={() => backToList(true)} />
   }
 
+  if (screen.name === 'detail') {
+    return (
+      <AccountDetail
+        account={screen.account}
+        data={data}
+        balance={balances[screen.account.id] ?? 0}
+        onBack={() => backToList(false)}
+        onEdit={() => setScreen({ name: 'edit', account: screen.account })}
+      />
+    )
+  }
+
   if (screen.name === 'edit') {
     const acc = screen.account
     const hasMovements = acc
@@ -424,7 +514,7 @@ export default function AccountsView() {
   function renderRow(acc) {
     const value = balances[acc.id] ?? 0
     return (
-      <button className="tx-row" key={acc.id} onClick={() => setScreen({ name: 'edit', account: acc })}>
+      <button className="tx-row" key={acc.id} onClick={() => setScreen({ name: 'detail', account: acc })}>
         <div>
           <p className="name">{acc.name}</p>
           <p className="meta">{accountMeta(acc)}</p>

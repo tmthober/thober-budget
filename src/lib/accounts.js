@@ -24,7 +24,7 @@ async function fetchAllTransactions() {
   for (;;) {
     const { data, error } = await supabase
       .from('transactions')
-      .select('id, category_id, account_id, amount, kind, date')
+      .select('id, category_id, account_id, amount, kind, date, note')
       .order('id')
       .range(from, from + pageSize - 1)
     if (error) throw error
@@ -43,7 +43,7 @@ export async function loadAccountsData() {
       .select('*')
       .order('date', { ascending: false })
       .order('created_at', { ascending: false }),
-    supabase.from('categories').select('id, is_income'),
+    supabase.from('categories').select('id, name, is_income'),
     fetchAllTransactions(),
   ])
   const err = a.error || tr.error || c.error
