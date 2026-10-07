@@ -1014,3 +1014,14 @@ input, select, textarea {
   background: var(--accent);
   color: #fff;
 }
+
+/* ---- Metas (Etapa 2) ---- */
+.target-sub.missing { color: #a8741a; }
+.target-sub.ok { color: var(--accent); }
+.month-summary-targets {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #a8741a;
+}
+.target-sub { cursor: pointer; }
+.target-sub.add { color: var(--ink-soft); opacity: 0.7; }

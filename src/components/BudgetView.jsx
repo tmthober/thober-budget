@@ -22,12 +22,16 @@ export default function BudgetView({ refreshKey }) {
   const [transactions, setTransactions] = useState([])
   const [accounts, setAccounts] = useState([])
   const [transfers, setTransfers] = useState([])
+  const [targets, setTargets] = useState({})
   const [overspendStats, setOverspendStats] = useState({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [editValue, setEditValue] = useState('')
   const [editError, setEditError] = useState(null)
+  const [targetEditingId, setTargetEditingId] = useState(null)
+  const [targetEditValue, setTargetEditValue] = useState('')
+  const [targetEditError, setTargetEditError] = useState(null)
   const [search, setSearch] = useState('')
   const [overspendTarget, setOverspendTarget] = useState(null)
   const [addingCategory, setAddingCategory] = useState(false)
@@ -43,15 +47,16 @@ export default function BudgetView({ refreshKey }) {
   async function loadData() {
     setLoading(true)
     setLoadError(false)
-    const [g, c, b, t, a, tr] = await Promise.all([
+    const [g, c, b, t, a, tr, tg] = await Promise.all([
       supabase.from('category_groups').select('*').order('sort_order'),
       supabase.from('categories').select('*').order('sort_order'),
       supabase.from('budget_entries').select('*'),
       supabase.from('transactions').select('*'),
       supabase.from('accounts').select('*'),
       supabase.from('account_transfers').select('*'),
+      supabase.from('category_targets').select('*'),
     ])
-    if (g.error || c.error || b.error || t.error || a.error || tr.error) {
+    if (g.error || c.error || b.error || t.error || a.error || tr.error || tg.error) {
       setLoadError(true)
       setLoading(false)
       return
@@ -62,6 +67,7 @@ export default function BudgetView({ refreshKey }) {
     setTransactions(t.data ?? [])
     setAccounts(a.data ?? [])
     setTransfers(tr.data ?? [])
+    setTargets(Object.fromEntries((tg.data ?? []).map((x) => [x.category_id, Number(x.monthly_amount)])))
 
     const { moves } = await fetchOverspendMoves(historyStartKey, monthKey)
     setOverspendStats(summarizeOverspendMoves(moves))
@@ -114,6 +120,11 @@ export default function BudgetView({ refreshKey }) {
   // Pagamento do cartão não entra no "Gasto do mês": a compra no cartão já é
   // contada na categoria em que foi feita.
   const spendingSummaries = expenseSummaries.filter((s) => !s.is_card_payment)
+  // Meta: quanto falta (meta − orçado do mês) em cada categoria que tem meta.
+  const missingFor = (s) => Math.max(0, (targets[s.id] ?? 0) - s.budgetedThisMonth)
+  const totalMissingTargets = spendingSummaries.reduce(
+    (sum, s) => sum + (targets[s.id] ? missingFor(s) : 0), 0
+  )
   const totalBudgetedThisMonth = spendingSummaries.reduce((sum, s) => sum + s.budgetedThisMonth, 0)
   const totalActivityThisMonth = spendingSummaries.reduce((sum, s) => sum + s.activityThisMonth, 0)
   const totalRemaining = totalBudgetedThisMonth - totalActivityThisMonth
@@ -131,6 +142,31 @@ export default function BudgetView({ refreshKey }) {
     setEditingId(cat.id)
     setEditValue(String(cat.budgetedThisMonth || ''))
     setEditError(null)
+  }
+
+  function startTargetEdit(cat) {
+    setTargetEditingId(cat.id)
+    setTargetEditValue(targets[cat.id] ? String(targets[cat.id]) : '')
+    setTargetEditError(null)
+  }
+
+  // Meta mensal: valor > 0 grava; vazio ou 0 remove a meta.
+  async function saveTarget(catId) {
+    const amount = parseFloat(targetEditValue.replace(',', '.')) || 0
+    const { error } = amount > 0
+      ? await supabase.from('category_targets').upsert(
+          { category_id: catId, monthly_amount: amount, updated_at: new Date().toISOString() },
+          { onConflict: 'category_id' }
+        )
+      : await supabase.from('category_targets').delete().eq('category_id', catId)
+    if (error) {
+      setTargetEditError('Não foi possível salvar. Verifique sua internet e tente de novo.')
+      return
+    }
+    setTargetEditingId(null)
+    setTargetEditError(null)
+    showToast(amount > 0 ? 'Meta atualizada' : 'Meta removida')
+    loadData()
   }
 
   async function saveEdit(catId) {
@@ -388,6 +424,11 @@ export default function BudgetView({ refreshKey }) {
             ? `Restam ${formatCurrency(totalRemaining)} orçados`
             : `${formatCurrency(Math.abs(totalRemaining))} acima do orçado`}
         </p>
+        {totalMissingTargets > 0 && (
+          <p className="month-summary-targets">
+            Faltam {formatCurrency(totalMissingTargets)} para cumprir as metas do mês
+          </p>
+        )}
       </div>
 
       <div className="budget-search">
@@ -456,10 +497,42 @@ export default function BudgetView({ refreshKey }) {
                               </p>
                             </>
                           ) : (
-                            <p className="sub" onClick={() => startEdit(cat)}>
-                              Orçado {formatCurrency(cat.budgetedThisMonth)}
-                              {cat.activityThisMonth !== 0 && ` · Gasto ${formatCurrency(cat.activityThisMonth)}`}
-                            </p>
+                            <>
+                              <p className="sub" onClick={() => startEdit(cat)}>
+                                Orçado {formatCurrency(cat.budgetedThisMonth)}
+                                {cat.activityThisMonth !== 0 && ` · Gasto ${formatCurrency(cat.activityThisMonth)}`}
+                              </p>
+                              {targetEditingId === cat.id ? (
+                                <>
+                                  <input
+                                    autoFocus
+                                    inputMode="decimal"
+                                    value={targetEditValue}
+                                    onChange={(e) => setTargetEditValue(e.target.value)}
+                                    onBlur={() => saveTarget(cat.id)}
+                                    onKeyDown={(e) => e.key === 'Enter' && saveTarget(cat.id)}
+                                    placeholder="Meta mensal (0 remove)"
+                                    style={{ width: 150, fontSize: 12, padding: '2px 6px', marginTop: 2 }}
+                                  />
+                                  {targetEditError && (
+                                    <p className="edit-error-text">{targetEditError}</p>
+                                  )}
+                                </>
+                              ) : targets[cat.id] > 0 ? (
+                                <p
+                                  className={`sub target-sub ${missingFor(cat) > 0 ? 'missing' : 'ok'}`}
+                                  onClick={() => startTargetEdit(cat)}
+                                >
+                                  {missingFor(cat) > 0
+                                    ? `Meta ${formatCurrency(targets[cat.id])} · faltam ${formatCurrency(missingFor(cat))}`
+                                    : `Meta ${formatCurrency(targets[cat.id])} · cumprida ✓`}
+                                </p>
+                              ) : (
+                                <p className="sub target-sub add" onClick={() => startTargetEdit(cat)}>
+                                  + Definir meta
+                                </p>
+                              )}
+                            </>
                           )
                         )}
                       </div>
