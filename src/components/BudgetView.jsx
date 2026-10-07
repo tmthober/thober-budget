@@ -31,6 +31,7 @@ export default function BudgetView({ refreshKey }) {
   const [editError, setEditError] = useState(null)
   const [targetEditingId, setTargetEditingId] = useState(null)
   const [targetEditValue, setTargetEditValue] = useState('')
+  const [targetEditType, setTargetEditType] = useState('set_aside')
   const [targetEditError, setTargetEditError] = useState(null)
   const [search, setSearch] = useState('')
   const [overspendTarget, setOverspendTarget] = useState(null)
@@ -67,7 +68,7 @@ export default function BudgetView({ refreshKey }) {
     setTransactions(t.data ?? [])
     setAccounts(a.data ?? [])
     setTransfers(tr.data ?? [])
-    setTargets(Object.fromEntries((tg.data ?? []).map((x) => [x.category_id, Number(x.monthly_amount)])))
+    setTargets(Object.fromEntries((tg.data ?? []).map((x) => [x.category_id, { amount: Number(x.monthly_amount), type: x.target_type ?? 'set_aside' }])))
 
     const { moves } = await fetchOverspendMoves(historyStartKey, monthKey)
     setOverspendStats(summarizeOverspendMoves(moves))
@@ -121,7 +122,19 @@ export default function BudgetView({ refreshKey }) {
   // contada na categoria em que foi feita.
   const spendingSummaries = expenseSummaries.filter((s) => !s.is_card_payment)
   // Meta: quanto falta (meta − orçado do mês) em cada categoria que tem meta.
-  const missingFor = (s) => Math.max(0, (targets[s.id] ?? 0) - s.budgetedThisMonth)
+  // "Separar mais": compara a meta com o orçado do mês.
+  // "Completar até": compara com o que já está no envelope (sobra do mês
+  // anterior + orçado do mês), sem descontar o gasto.
+  const targetLabel = (t) =>
+    t.type === 'refill'
+      ? `Meta: ter ${formatCurrency(t.amount)}`
+      : `Meta: ${formatCurrency(t.amount)} por mês`
+  const missingFor = (s) => {
+    const t = targets[s.id]
+    if (!t) return 0
+    const have = t.type === 'refill' ? s.available + s.activityThisMonth : s.budgetedThisMonth
+    return Math.max(0, t.amount - have)
+  }
   const totalMissingTargets = spendingSummaries.reduce(
     (sum, s) => sum + (targets[s.id] ? missingFor(s) : 0), 0
   )
@@ -146,7 +159,8 @@ export default function BudgetView({ refreshKey }) {
 
   function startTargetEdit(cat) {
     setTargetEditingId(cat.id)
-    setTargetEditValue(targets[cat.id] ? String(targets[cat.id]) : '')
+    setTargetEditValue(targets[cat.id] ? String(targets[cat.id].amount) : '')
+    setTargetEditType(targets[cat.id]?.type ?? 'set_aside')
     setTargetEditError(null)
   }
 
@@ -155,7 +169,7 @@ export default function BudgetView({ refreshKey }) {
     const amount = parseFloat(targetEditValue.replace(',', '.')) || 0
     const { error } = amount > 0
       ? await supabase.from('category_targets').upsert(
-          { category_id: catId, monthly_amount: amount, updated_at: new Date().toISOString() },
+          { category_id: catId, monthly_amount: amount, target_type: targetEditType, updated_at: new Date().toISOString() },
           { onConflict: 'category_id' }
         )
       : await supabase.from('category_targets').delete().eq('category_id', catId)
@@ -503,29 +517,57 @@ export default function BudgetView({ refreshKey }) {
                                 {cat.activityThisMonth !== 0 && ` · Gasto ${formatCurrency(cat.activityThisMonth)}`}
                               </p>
                               {targetEditingId === cat.id ? (
-                                <>
+                                <div className="target-editor">
+                                  <div className="target-type-toggle" role="group" aria-label="Tipo de meta">
+                                    <button
+                                      type="button"
+                                      className={targetEditType === 'set_aside' ? 'active' : ''}
+                                      onClick={() => setTargetEditType('set_aside')}
+                                    >
+                                      Separar mais
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={targetEditType === 'refill' ? 'active' : ''}
+                                      onClick={() => setTargetEditType('refill')}
+                                    >
+                                      Completar até
+                                    </button>
+                                  </div>
+                                  <p className="target-hint">
+                                    {targetEditType === 'set_aside'
+                                      ? 'Colocar este valor todo mês, sem olhar a sobra. Bom para contas e poupança.'
+                                      : 'Ter este valor disponível no envelope; a sobra do mês anterior conta. Bom para mercado, lazer, combustível.'}
+                                  </p>
                                   <input
                                     autoFocus
                                     inputMode="decimal"
                                     value={targetEditValue}
                                     onChange={(e) => setTargetEditValue(e.target.value)}
-                                    onBlur={() => saveTarget(cat.id)}
                                     onKeyDown={(e) => e.key === 'Enter' && saveTarget(cat.id)}
-                                    placeholder="Meta mensal (0 remove)"
-                                    style={{ width: 150, fontSize: 12, padding: '2px 6px', marginTop: 2 }}
+                                    placeholder="Valor da meta (0 remove)"
+                                    style={{ width: 170, fontSize: 12, padding: '4px 6px', marginTop: 4 }}
                                   />
                                   {targetEditError && (
                                     <p className="edit-error-text">{targetEditError}</p>
                                   )}
-                                </>
-                              ) : targets[cat.id] > 0 ? (
+                                  <div className="target-editor-actions">
+                                    <button type="button" className="secondary-btn" onClick={() => saveTarget(cat.id)}>
+                                      Salvar
+                                    </button>
+                                    <button type="button" className="secondary-btn" onClick={() => setTargetEditingId(null)}>
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : targets[cat.id]?.amount > 0 ? (
                                 <p
                                   className={`sub target-sub ${missingFor(cat) > 0 ? 'missing' : 'ok'}`}
                                   onClick={() => startTargetEdit(cat)}
                                 >
                                   {missingFor(cat) > 0
-                                    ? `Meta ${formatCurrency(targets[cat.id])} · faltam ${formatCurrency(missingFor(cat))}`
-                                    : `Meta ${formatCurrency(targets[cat.id])} · cumprida ✓`}
+                                    ? `${targetLabel(targets[cat.id])} · faltam ${formatCurrency(missingFor(cat))}`
+                                    : `${targetLabel(targets[cat.id])} · cumprida ✓`}
                                 </p>
                               ) : (
                                 <p className="sub target-sub add" onClick={() => startTargetEdit(cat)}>
