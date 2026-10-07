@@ -1,3 +1,4 @@
+import CategoryDetailView from './CategoryDetailView'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../supabaseClient'
@@ -41,6 +42,7 @@ export default function BudgetView({ refreshKey }) {
   const [addCategoryError, setAddCategoryError] = useState(null)
   const [savingCategory, setSavingCategory] = useState(false)
   const [copyPanel, setCopyPanel] = useState(null)
+  const [detailCatId, setDetailCatId] = useState(null)
 
   const monthKey = toMonthKey(month)
   const historyStartKey = toMonthKey(addMonths(month, -(HISTORY_WINDOW_MONTHS - 1)))
@@ -278,6 +280,21 @@ export default function BudgetView({ refreshKey }) {
     loadData()
   }
 
+  if (detailCatId) {
+    const detailCat = summaries.find((c) => c.id === detailCatId)
+    if (detailCat) {
+      return (
+        <CategoryDetailView
+          category={detailCat}
+          month={month}
+          target={targets[detailCatId]}
+          onBack={() => setDetailCatId(null)}
+          onDataChanged={loadData}
+        />
+      )
+    }
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
@@ -480,7 +497,13 @@ export default function BudgetView({ refreshKey }) {
                   <div className="category-row" key={cat.id}>
                     <div className="category-row-top">
                       <div>
-                        <p className="name">{cat.name}</p>
+                        {cat.is_card_payment ? (
+                          <p className="name">{cat.name}</p>
+                        ) : (
+                          <p className="name name-link" onClick={() => setDetailCatId(cat.id)}>
+                            {cat.name} <span className="name-chevron">›</span>
+                          </p>
+                        )}
                         {editingId === cat.id ? (
                           <>
                             <input

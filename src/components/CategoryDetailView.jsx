@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { IconChevronLeft } from './icons'
-import { formatCurrency, formatMonthLabel, toMonthKey } from '../lib/budget'
+import { formatCurrency, formatMonthLabel, toMonthKey, addMonths } from '../lib/budget'
 import { useToast } from '../lib/ToastContext'
 
 // Formata 'YYYY-MM-DD' como 'DD/MM' para exibição na timeline
@@ -11,7 +11,7 @@ function formatDay(dateStr) {
 }
 
 
-export default function CategoryDetailView({ category, month, onBack, onDataChanged }) {
+export default function CategoryDetailView({ category, month, target, onBack, onDataChanged }) {
   const showToast = useToast()
   const monthKey = toMonthKey(month)
 
@@ -26,19 +26,30 @@ export default function CategoryDetailView({ category, month, onBack, onDataChan
   const [editValue, setEditValue] = useState('')
   const [editError, setEditError] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [accountsById, setAccountsById] = useState({})
+
+  // Meta mensal: valor fixo que as coberturas nunca alteram
+  const [editingTarget, setEditingTarget] = useState(false)
+  const [targetValue, setTargetValue] = useState(target ? String(target.amount) : '')
+  const [targetType, setTargetType] = useState(target?.type ?? 'set_aside')
+  const [targetError, setTargetError] = useState(null)
+  const [savingTarget, setSavingTarget] = useState(false)
 
   const ymTarget = monthKey.slice(0, 7) // 'YYYY-MM'
 
   async function loadData() {
     setLoading(true)
     setLoadError(false)
-    const [txRes, movesRes, budgetRes] = await Promise.all([
+    // Fim do mês como "primeiro dia do mês seguinte" (comparação exclusiva):
+    // evita datas inválidas como 31 de setembro, que o Postgres rejeita.
+    const nextMonthStart = toMonthKey(addMonths(month, 1))
+    const [txRes, movesRes, budgetRes, accRes] = await Promise.all([
       supabase
         .from('transactions')
         .select('*')
         .eq('category_id', category.id)
-        .gte('date', `${ymTarget}-01`)
-        .lte('date', `${ymTarget}-31`)
+        .gte('date', monthKey)
+        .lt('date', nextMonthStart)
         .order('date', { ascending: true }),
       supabase
         .from('overspend_moves')
@@ -51,15 +62,17 @@ export default function CategoryDetailView({ category, month, onBack, onDataChan
         .eq('category_id', category.id)
         .eq('month', monthKey)
         .maybeSingle(),
+      supabase.from('accounts').select('id, name'),
     ])
 
-    if (txRes.error || movesRes.error || budgetRes.error) {
+    if (txRes.error || movesRes.error || budgetRes.error || accRes.error) {
       setLoadError(true)
       setLoading(false)
       return
     }
 
     setTransactions(txRes.data ?? [])
+    setAccountsById(Object.fromEntries((accRes.data ?? []).map((a) => [a.id, a.name])))
     setMoves(movesRes.data ?? [])
     const bAmt = budgetRes.data ? Number(budgetRes.data.budgeted_amount) : 0
     setBudgetedThisMonth(bAmt)
@@ -88,6 +101,45 @@ export default function CategoryDetailView({ category, month, onBack, onDataChan
     showToast('Orçamento atualizado')
     onDataChanged?.()
   }
+
+  async function saveTarget() {
+    setSavingTarget(true)
+    setTargetError(null)
+    const amount = parseFloat(String(targetValue).replace(',', '.')) || 0
+    const { error } = amount > 0
+      ? await supabase.from('category_targets').upsert(
+          { category_id: category.id, monthly_amount: amount, target_type: targetType, updated_at: new Date().toISOString() },
+          { onConflict: 'category_id' }
+        )
+      : await supabase.from('category_targets').delete().eq('category_id', category.id)
+    setSavingTarget(false)
+    if (error) {
+      setTargetError('Não foi possível salvar. Verifique sua internet e tente de novo.')
+      return
+    }
+    setEditingTarget(false)
+    showToast(amount > 0 ? 'Meta atualizada' : 'Meta removida')
+    onDataChanged?.()
+  }
+
+  function cancelTargetEdit() {
+    setEditingTarget(false)
+    setTargetValue(target ? String(target.amount) : '')
+    setTargetType(target?.type ?? 'set_aside')
+    setTargetError(null)
+  }
+
+  // "Separar mais" compara com o orçado do mês; "Completar até" com o que já
+  // está no envelope (sobra do mês anterior + orçado), sem descontar o gasto.
+  const missingTarget = target
+    ? Math.max(
+        0,
+        target.amount -
+          (target.type === 'refill'
+            ? category.available + category.activityThisMonth
+            : category.budgetedThisMonth)
+      )
+    : 0
 
   function cancelEdit() {
     setEditing(false)
@@ -215,6 +267,81 @@ export default function CategoryDetailView({ category, month, onBack, onDataChan
               <span className="detail-summary-label">Gasto no mês</span>
               <span className="detail-summary-value">{formatCurrency(totalSpent)}</span>
             </div>
+            <div className="detail-summary-row">
+              <span className="detail-summary-label">Disponível agora</span>
+              <span className="detail-summary-value">{formatCurrency(category.available)}</span>
+            </div>
+            <div className="detail-target">
+              <div className="detail-summary-row">
+                <span className="detail-summary-label">Meta</span>
+                {!editingTarget && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="detail-summary-value">
+                      {target
+                        ? target.type === 'refill'
+                          ? `Ter ${formatCurrency(target.amount)}`
+                          : `${formatCurrency(target.amount)} por mês`
+                        : 'Sem meta'}
+                    </span>
+                    <button
+                      className="secondary-btn"
+                      onClick={() => setEditingTarget(true)}
+                      style={{ padding: '4px 10px', fontSize: 13 }}
+                    >
+                      {target ? 'Editar' : 'Definir'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              {!editingTarget && target && (
+                <p className="target-hint" style={{ textAlign: 'right', marginLeft: 'auto' }}>
+                  {missingTarget > 0 ? `Faltam ${formatCurrency(missingTarget)} neste mês` : 'Meta cumprida neste mês ✓'}
+                </p>
+              )}
+              {editingTarget && (
+                <div className="target-editor">
+                  <div className="target-type-toggle" role="group" aria-label="Tipo de meta">
+                    <button
+                      type="button"
+                      className={targetType === 'set_aside' ? 'active' : ''}
+                      onClick={() => setTargetType('set_aside')}
+                    >
+                      Separar mais
+                    </button>
+                    <button
+                      type="button"
+                      className={targetType === 'refill' ? 'active' : ''}
+                      onClick={() => setTargetType('refill')}
+                    >
+                      Completar até
+                    </button>
+                  </div>
+                  <p className="target-hint">
+                    {targetType === 'set_aside'
+                      ? 'Colocar este valor todo mês, sem olhar a sobra. Bom para contas e poupança.'
+                      : 'Ter este valor disponível no envelope; a sobra do mês anterior conta. Bom para mercado, lazer, combustível.'}
+                  </p>
+                  <input
+                    autoFocus
+                    inputMode="decimal"
+                    value={targetValue}
+                    onChange={(e) => setTargetValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && saveTarget()}
+                    placeholder="Valor da meta (0 remove)"
+                    style={{ width: 170, fontSize: 14, padding: '4px 8px', marginTop: 6 }}
+                  />
+                  {targetError && <p className="edit-error-text">{targetError}</p>}
+                  <div className="target-editor-actions">
+                    <button className="secondary-btn" onClick={saveTarget} disabled={savingTarget}>
+                      {savingTarget ? '...' : 'Salvar'}
+                    </button>
+                    <button className="secondary-btn" onClick={cancelTargetEdit} disabled={savingTarget}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             {totalBorrowed > 0 && (
               <div className="detail-summary-row">
                 <span className="detail-summary-label">Recebeu de empréstimo</span>
@@ -251,8 +378,10 @@ export default function CategoryDetailView({ category, month, onBack, onDataChan
                             − {formatCurrency(Number(tx.amount))}
                           </span>
                         </div>
-                        {tx.note && (
-                          <p className="timeline-note">{tx.note}</p>
+                        {(accountsById[tx.account_id] || tx.note) && (
+                          <p className="timeline-note">
+                            {[accountsById[tx.account_id], tx.note].filter(Boolean).join(' · ')}
+                          </p>
                         )}
                       </div>
                     </div>

@@ -1044,3 +1044,8 @@ input, select, textarea {
 .target-hint { margin: 6px 0 0; font-size: 11px; color: var(--ink-soft); max-width: 260px; }
 .target-editor-actions { display: flex; gap: 8px; margin-top: 8px; }
 .target-editor-actions .secondary-btn { padding: 4px 12px; font-size: 12px; }
+
+/* ---- Página da categoria ---- */
+.name-link { cursor: pointer; }
+.name-chevron { color: var(--ink-soft); font-weight: 400; margin-left: 2px; }
+.detail-target { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }
