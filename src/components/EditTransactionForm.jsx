@@ -16,6 +16,7 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
   const [categories, setCategories] = useState([])
   const [categoryId, setCategoryId] = useState(transaction.category_id ?? '')
   const [accounts, setAccounts] = useState([])
+  const [members, setMembers] = useState([])
   const [accountId, setAccountId] = useState(transaction.account_id ?? '')
   const [amountCents, setAmountCents] = useState(amountToCents(Math.abs(transaction.amount)))
   const [date, setDate] = useState(transaction.date)
@@ -28,19 +29,28 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
 
   useEffect(() => {
     async function load() {
-      const [g, c, a] = await Promise.all([
+      const [g, c, a, m] = await Promise.all([
         supabase.from('category_groups').select('*').order('sort_order'),
         supabase.from('categories').select('*').order('sort_order'),
         supabase.from('accounts').select('*').order('sort_order'),
+        supabase.from('family_members').select('*'),
       ])
       setGroups(g.data ?? [])
       setCategories(c.data ?? [])
       setAccounts(a.data ?? [])
+      // Quem registrou é só informativo: se falhar, o formulário segue normal.
+      setMembers(m?.data ?? [])
     }
     load()
   }, [])
 
   const kind = transaction.kind ?? 'expense'
+  const author = members.find((m) => m.user_id === transaction.created_by)
+  const createdLabel = transaction.created_at
+    ? new Date(transaction.created_at).toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      })
+    : ''
   const accountOptions = accounts.filter((a) => kind === 'expense' || a.type !== 'credit_card')
   const selectedAccount = accounts.find((a) => a.id === accountId)
   const needsCategory = kind === 'expense' && selectedAccount?.type !== 'tracking'
@@ -131,6 +141,16 @@ export default function EditTransactionForm({ transaction, onBack, onSaved, onDe
         <span>{kind === 'income' ? 'Editar entrada' : 'Editar lançamento'}</span>
         <span style={{ width: 44 }} />
       </div>
+
+      {author && (
+        <div className="who-line">
+          <span className="who-badge" aria-hidden="true">{author.initials}</span>
+          <span>
+            Registrado por {author.name}
+            {createdLabel && ` · ${createdLabel}`}
+          </span>
+        </div>
+      )}
 
       <form className="form-screen" onSubmit={handleSubmit}>
         {accounts.length > 0 && (

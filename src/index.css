@@ -1062,3 +1062,27 @@ input, select, textarea {
 }
 .auto-row.partial { color: #a8741a; }
 .auto-row.none { color: var(--ink-soft); }
+
+/* ---- Quem registrou o lançamento ---- */
+.who-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.who-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft, #e3efe9);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+}
